@@ -1,18 +1,30 @@
-import sys
+import sys, cProfile
 
 import pyopencl as cl
 
 import numpy as np
 import scipy.misc as scp
 
-def init_data(num):
+def do_cprofile(func):
+    def profiled_func(*args, **kwargs):
+        profile = cProfile.Profile()
+        try:
+            profile.enable()
+            result = func(*args, **kwargs)
+            profile.disable()
+            return result
+        finally:
+            profile.print_stats()
+    return profiled_func
+
+def init_data(num, res_x, res_y):
     pos = np.zeros((num, 4), dtype=np.int32)
 
     #pos[:,0] = np.arange(num) % np.sqrt(num)
-    pos[:,0] = np.arange(num) % 1280
+    pos[:,0] = np.arange(num) % res_x
     pos[:,0] *= np.random.random_sample((num,))
 
-    pos[:,1] = np.arange(num) % 720
+    pos[:,1] = np.arange(num) % res_y
     pos[:,1] *= np.random.random_sample((num,))
 
     pos[:,2] = 0
@@ -28,14 +40,6 @@ def init_data(num):
     lifetime[:] = 10
 
     return pos, mass, power, lifetime
-
-def draw(num, pos, count):
-    dimen = np.sqrt(num)
-    world = np.zeros((dimen,dimen))
-    #for starling in pos:
-    #    if starling[0] < dimen and starling[0] > 0 and starling[1] < dimen and starling[1] > 0:
-    #        world[starling[0],starling[1]] = True
-    #scp.imsave("./out/image/frame_{0:05d}.png".format(count),world.astype(bool))
 
 class KDTree(object):
     """requires dataset with length of rational sqrt for now"""
@@ -93,8 +97,10 @@ class OpenCl(object):
         program = cl.Program(self.ctx, fstr).build()
         return program
 
-    def cl_load_data(self, pos, mass, power, lifetime):
+    def cl_load_data(self, pos, mass, power, lifetime, world):
         mf = cl.mem_flags
+
+        world_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=world.flatten())
 
         pos_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=pos)
         mass_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=mass)
@@ -103,13 +109,16 @@ class OpenCl(object):
 
         out = cl.Buffer(self.ctx, mf.WRITE_ONLY, pos.nbytes)
 
-        return pos_cl, mass_cl, power_cl, lifetime_cl, out
+        return pos_cl, mass_cl, power_cl, lifetime_cl, world_cl, out
 
-    def execute(self, pos, mass, power, lifetime):
-        pos_cl, mass_cl, power_cl, lifetime_cl, out = self.cl_load_data(pos, mass, power, lifetime)
+    def execute(self, pos, mass, power, lifetime, world):
+        pos_cl, mass_cl, power_cl, lifetime_cl, world_cl, out = self.cl_load_data(pos, mass, power, lifetime, world)
 
         inner_rad = np.int32(1)
         outer_rad = np.int32(3)
+
+        world_x = np.int32(world.shape[0])
+        world_y = np.int32(world.shape[1])
 
         ret = np.zeros_like(pos)
 
@@ -120,40 +129,79 @@ class OpenCl(object):
                       mass_cl,
                       power_cl,
                       lifetime_cl,
+                      world_cl,
                       out,
-                      inner_rad, outer_rad
+                      inner_rad, outer_rad,
+                      world_x, world_y
                       )
 
-        self.program.knn(self.queue, global_size, local_size, *(kernalargs)).wait()
+        self.program.flock(self.queue, global_size, local_size, *(kernalargs)).wait()
         cl.enqueue_read_buffer(self.queue, out, ret)
+        #finish not needed with wait
         #self.queue.finish()
         return ret
 
+def form_world(accel_vector, x_size, y_size):
+    world = np.zeros((x_size, y_size), dtype=np.int32)
+    world[accel_vector[:,0],accel_vector[:,1]] = 1
+    return world
+
+def draw(image,count):
+    scp.imsave("./out/image/frame_{0:05d}.png".format(count),image.astype(bool))
+    #dimen = np.sqrt(num)
+    #world = np.zeros((dimen,dimen))
+    #for starling in pos:
+    #    if starling[0] < dimen and starling[0] > 0 and starling[1] < dimen and starling[1] > 0:
+    #        world[starling[0],starling[1]] = True
+    #scp.imsave("./out/image/frame_{0:05d}.png".format(count),world.astype(bool))
+
+
 if __name__ == "__main__":
+    np.set_printoptions(threshold=np.nan,linewidth=1024)
+
     sys.settrace
     sys.setrecursionlimit(1024**2)
+    
+    num = 1024**2
+    resolution = [1024,1024]
 
-    #num = 1024**2
-    num = 921600
-    resolution = [1280,720]
+    #num = 1280 * 720
+    #resolution = [1280,720]
+    
+    #num = 64 * 64
+    #resolution = [64,64]
+
+    #num = 640 * 480
+    #resolution = [640, 480]
+
+    #num = 200*200
+    #resolution = [200,200]
+
+    print num
+    print resolution
+
     dt = .001
 
-    pos, mass, power, lifetime = init_data(num)
-
-    kd = KDTree(min_leaf_size=4)
-    kd.execute(pos, resolution)
-
-    print kd.tree
-
     opcl = OpenCl(num, dt)
+
+    pos, mass, power, lifetime = init_data(num,resolution[0],resolution[1])
+
+    world = form_world(pos,resolution[0],resolution[1])
+
+    #kd = KDTree(min_leaf_size=4)
+    #kd.execute(pos, resolution)   
 
     count = 0
     
     while True:
-         ret = opcl.execute(pos, mass, power, lifetime)
-         print count
-         print ret
-         draw(num, ret, count)
-         #kd.execute(ret, resolution)
-         pos = ret;
-         count += 1
+        #draw(world, count)
+
+        result = opcl.execute(pos, mass, power, lifetime, world)
+        print result
+        #world = form_world(result,resolution[0],resolution[1])
+
+        #print world
+        print count
+        #kd.execute(ret, resolution)
+        pos = result 
+        count += 1
