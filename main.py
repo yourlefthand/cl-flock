@@ -144,8 +144,11 @@ if __name__ == "__main__":
     #num = 1024**2
     #resolution = [1024,1024]
 
-    num = 1280 * 720
-    resolution = [720, 1280]
+    # num = 1280 * 720
+    # resolution = [720, 1280]
+
+    num = 640 * 480
+    resolution = [480, 640]
 
     dt = .001
 
