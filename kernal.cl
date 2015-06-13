@@ -29,19 +29,37 @@ __kernel void knn(
 					neighbor.y = y + p.y;
 
 					float d = distance(convert_float2(p),convert_float2(neighbor));
-					
-					if(d <= outer_rad && d > inner_rad){
-
+					out[gid].s0 = convert_int_rte(d);
+					if (islessequal(d, convert_float(outer_rad)) > 0){
+						if (isgreater(d, convert_float(inner_rad)) > 0){
+							cohesion.z++;
+							cohesion.lo += (p - neighbor) % convert_int_sat(outer_rad - d);
+						}
+						else{
+							separation.z++;
+							separation.lo += -1 * (p - neighbor) * convert_int_sat(inner_rad - d); 
+						}
 					}
-					if(d <= inner_rad && d > 0){
-
+					else{
+						out[gid].s0 = p.x;
+						out[gid].s1 = p.y;
 					}
 				}
 				else {
-					out[gid].s0 = 0;
-					out[gid].s1 = 0;
+					out[gid].s0 = p.x;
+					out[gid].s1 = p.y;
 				}
 			}
-		}	
+			else {
+				out[gid].s0 = p.x;
+				out[gid].s1 = p.y;
+			}
+		}
 	}
+
+	private int4 intention;
+	intention.lo = (cohesion.lo / cohesion.z);
+	intention.hi = (separation.lo / separation.z);
+
+	out[gid].s01 = p;
 }
