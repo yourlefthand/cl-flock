@@ -33,33 +33,41 @@ __kernel void knn(
 					if (islessequal(d, convert_float(outer_rad)) > 0){
 						if (isgreater(d, convert_float(inner_rad)) > 0){
 							cohesion.z++;
-							cohesion.lo += (p - neighbor) % convert_int_sat(outer_rad - d);
+							// cohesion.lo += (p - neighbor) / convert_int_sat(outer_rad - d);
+							cohesion.lo += p.x;
+							// cohesion.lo += 0;
 						}
 						else{
 							separation.z++;
-							separation.lo += -1 * (p - neighbor) * convert_int_sat(inner_rad - d); 
+							// separation.lo += -1 * (p - neighbor) * convert_int_sat(inner_rad - d); 
+							// separation.lo += -1 * (p - neighbor); 
+							// separation.lo += 0; 
 						}
 					}
 					else{
-						out[gid].s0 = p.x;
-						out[gid].s1 = p.y;
+						// out[gid].s0 = p.x;
+						// out[gid].s1 = p.y;
 					}
 				}
 				else {
-					out[gid].s0 = p.x;
-					out[gid].s1 = p.y;
+					// out[gid].s0 = p.x;
+					// out[gid].s1 = p.y;
 				}
 			}
 			else {
-				out[gid].s0 = p.x;
-				out[gid].s1 = p.y;
+				// out[gid].s0 = p.x;
+				// out[gid].s1 = p.y;
 			}
 		}
 	}
 
-	private int4 intention;
-	intention.lo = (cohesion.lo / cohesion.z);
-	intention.hi = (separation.lo / separation.z);
+	private int2 intention;
+	//intention = (((cohesion.lo / cohesion.z) + (separation.lo / separation.z)) / 2);
+	intention = (cohesion.lo / cohesion.z);
 
-	out[gid].s01 = p;
+	out[gid].s01 = intention;
+
+	out[gid].s2 = inner_rad;
+	out[gid].s3 = outer_rad;
+	out[gid].hi = 0;
 }
