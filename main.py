@@ -141,8 +141,8 @@ if __name__ == "__main__":
     sys.settrace
     sys.setrecursionlimit(1024**2)
 
-    #num = 1024**2
-    #resolution = [1024,1024]
+    # num = 1024**2
+    # resolution = [1024,1024]
 
     # num = 1280 * 720
     # resolution = [720, 1280]
@@ -161,11 +161,16 @@ if __name__ == "__main__":
     
     while True:
          draw(world, count)
-         starlings = opcl.execute(starlings, world)
+         print "init"
          print starlings[:,:2]
-         
-         world = form_world(starlings, resolution[0],resolution[1])        
-         # print world
+         # starlings = opcl.execute(starlings, world)
+         starlings = opcl.execute(starlings, world)
+         #starlings = init_data(num, resolution[0], resolution[1])
+         print "res"
+         print starlings[:,:2]
+
+        # print world 
+         world = form_world(starlings, resolution[0],resolution[1])
          
          print count
   
