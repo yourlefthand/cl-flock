@@ -34,13 +34,13 @@ __kernel void knn(
 						if (isgreater(d, convert_float(inner_rad)) > 0){
 							cohesion.z++;
 							// cohesion.lo += (p - neighbor) / convert_int_sat(outer_rad - d);
-							cohesion.lo += p.x;
+							cohesion.lo += (p - neighbor) / convert_int_sat(outer_rad - d);
 							// cohesion.lo += 0;
 						}
 						else{
 							separation.z++;
-							// separation.lo += -1 * (p - neighbor) * convert_int_sat(inner_rad - d); 
-							// separation.lo += -1 * (p - neighbor); 
+							separation.lo += -1 * (p - neighbor) * convert_int_sat(inner_rad - d); 
+							//separation.lo += -1 * (p - neighbor); 
 							// separation.lo += 0; 
 						}
 					}
@@ -62,10 +62,14 @@ __kernel void knn(
 	}
 
 	private int2 intention;
-	//intention = (((cohesion.lo / cohesion.z) + (separation.lo / separation.z)) / 2);
-	intention = (cohesion.lo / cohesion.z);
+	intention = (((cohesion.lo / cohesion.z) + (separation.lo / separation.z)) / 2);
+	//intention = (cohesion.lo / cohesion.z);
 
-	out[gid].s01 = intention;
+	if ((p.x + intention.x) >= 0 && (p.x + intention.x) < world_size_x && (p.y + intention.y) >= 0 && (p.y + intention.y) < world_size_y){
+		out[gid].s01 = p + intention;
+	} else{
+		out[gid].s01 = p;
+	}
 
 	out[gid].s2 = inner_rad;
 	out[gid].s3 = outer_rad;
