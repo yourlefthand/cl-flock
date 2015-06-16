@@ -141,6 +141,9 @@ if __name__ == "__main__":
     sys.settrace
     sys.setrecursionlimit(1024**2)
 
+    # num = 1920 * 1080
+    # resolution = [1080, 1920]
+
     # num = 1024**2
     # resolution = [1024,1024]
 
@@ -149,6 +152,9 @@ if __name__ == "__main__":
 
     num = 640 * 480
     resolution = [480, 640]
+
+    # num = 64 * 64
+    # resolution = [64, 64]
 
     dt = .001
 
