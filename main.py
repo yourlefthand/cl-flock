@@ -6,18 +6,31 @@ import numpy as np
 import scipy.misc as scp
 
 def init_data(num, res_x, res_y):
-    pos = np.zeros((num, 8), dtype=np.int32)
+    pop = np.zeros((num, 8), dtype=np.int32)
 
-    pos[:,0] = np.arange(num) % res_x
-    pos[:,0] *= np.random.random_sample((num,))
+    max_mass = 32
+    max_power = 16
 
-    pos[:,1] = np.arange(num) % res_y
-    pos[:,1] *= np.random.random_sample((num,))
+    #initial position
+    pop[:,0] = np.arange(num) % res_x
+    pop[:,0] *= np.random.random_sample((num,))
 
-    pos[:,2] = 3
-    pos[:,3] = 9
+    pop[:,1] = np.arange(num) % res_y
+    pop[:,1] *= np.random.random_sample((num,))
 
-    return pos
+    #velocity + position provides vector
+    pop[:,2] = 0
+    pop[:,3] = 0
+
+    #mass, power randomized? should be part of genome - eventually?
+    pop[:,4] = np.random.randint(1,max_mass,num)[:]
+    pop[:,5] = np.random.randint(1,max_power,num)[:] * pop[:,4]
+
+    #genomic weights to be used as bytestrings
+    pop[:,6] = 0 
+    pop[:,7] = 0
+
+    return pop
 
 def draw(world, count):
     scp.imsave("./out/image/frame_{0:05d}.png".format(count),world.astype(bool))
@@ -120,6 +133,12 @@ class OpenCl(object):
         world_x = np.int32(world.shape[0])
         world_y = np.int32(world.shape[1])
 
+        inner_rad = np.int32(3)
+        outer_rad = np.int32(9)
+
+        c_acc_x = np.float32(0)
+        c_acc_y = np.float32(1)
+
         ret = np.zeros_like(pos)
 
         global_size = (self.num,)
@@ -129,7 +148,9 @@ class OpenCl(object):
                       pos_cl,
                       world_cl,
                       out,
-                      world_x, world_y
+                      c_acc_x, c_acc_y,
+                      world_x, world_y,
+                      inner_rad, outer_rad
                      )
 
         self.program.knn(self.queue, global_size, local_size, *(kernalargs)).wait()
@@ -160,6 +181,8 @@ if __name__ == "__main__":
 
     starlings = init_data(num, resolution[0], resolution[1])
     world = form_world(starlings, resolution[0],resolution[1])
+
+    print starlings[:,4:6]
 
     opcl = OpenCl(num, dt)
 
