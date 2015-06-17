@@ -2,7 +2,9 @@ __kernel void knn(
 	__global int8* starling,
 	__global int* world,
 	__global int8* out,
-	int world_size_x, int world_size_y
+	float c_acc_x, float c_acc_y,
+	int world_size_x, int world_size_y,
+	int inner_rad, int outer_rad
 	)
 {
 	unsigned int gid = get_global_id(0);
@@ -11,10 +13,14 @@ __kernel void knn(
 	private int3 cohesion;
 	private int3 alignment;
 
+	private int2 c_acc;
+	c_acc.x = c_acc_x;
+	c_acc.y = c_acc_y;
+
 	private int2 p = starling[gid].s01;
 
-	private int inner_rad = starling[gid].s2;
-	private int outer_rad = starling[gid].s3;
+	private int m = starling[gid].s2;
+	private int w = starling[gid].s3;
 
 	for(int i = (-1 * outer_rad);i <= outer_rad; i++){
 		int y = p.y + i;
@@ -33,13 +39,13 @@ __kernel void knn(
 					if (islessequal(d, convert_float(outer_rad)) > 0){
 						if (isgreater(d, convert_float(inner_rad)) > 0){
 							cohesion.z++;
-							// cohesion.lo += (p - neighbor) / convert_int_sat(outer_rad - d);
 							cohesion.lo += (p - neighbor) / convert_int_sat(outer_rad - d);
+							// cohesion.lo += (p - neighbor);
 							// cohesion.lo += 0;
 						}
 						else{
 							separation.z++;
-							separation.lo += -1 * (p - neighbor) * convert_int_sat(inner_rad - d); 
+							separation.lo += -1 * (p - neighbor) * convert_int_sat(inner_rad - d);
 							//separation.lo += -1 * (p - neighbor); 
 							// separation.lo += 0; 
 						}
@@ -62,7 +68,7 @@ __kernel void knn(
 	}
 
 	private int2 intention;
-	intention = (((cohesion.lo / cohesion.z) + (separation.lo / separation.z)) / 2);
+	intention = (((cohesion.lo / cohesion.z) + (separation.lo / separation.z)) / 2) + c_acc;
 	//intention = (cohesion.lo / cohesion.z);
 
 	if ((p.x + intention.x) >= 0 && (p.x + intention.x) < world_size_x && (p.y + intention.y) >= 0 && (p.y + intention.y) < world_size_y){
