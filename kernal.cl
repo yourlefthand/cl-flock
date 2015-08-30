@@ -2,22 +2,19 @@ __kernel void knn(
 	__global int8* starling,
 	__global int* world,
 	__global int8* out,
-	float c_acc_x, float c_acc_y,
+	__private int2 constants,
 	int world_size_x, int world_size_y,
 	int inner_rad, int outer_rad
 	)
 {
 	unsigned int gid = get_global_id(0);
 
-	private int3 separation;
-	private int3 cohesion;
-	private int3 alignment;
-
-	private int2 c_acc;
-	c_acc.x = c_acc_x;
-	c_acc.y = c_acc_y;
+	private int3 separation = 0;
+	private int3 cohesion = 0;
+//	private int3 alignment = 0;
 
 	private int2 p = starling[gid].s01;
+	private int2 v = starling[gid].s23;
 
 	private int m = starling[gid].s2;
 	private int w = starling[gid].s3;
@@ -30,7 +27,7 @@ __kernel void knn(
 			int column = row + x;
 			if (row >= 0 && row < world_size_y && column >= row && column < row + world_size_y){
 				if (world[column] > 0){
-					private int2 neighbor;
+					private int2 neighbor = 0;
 					neighbor.x = x + p.x;
 					neighbor.y = y + p.y;
 
@@ -39,14 +36,14 @@ __kernel void knn(
 					if (islessequal(d, convert_float(outer_rad)) > 0){
 						if (isgreater(d, convert_float(inner_rad)) > 0){
 							cohesion.z++;
-							cohesion.lo += (p - neighbor) / convert_int_sat(outer_rad - d);
-							// cohesion.lo += (p - neighbor);
+							//cohesion.lo += (neighbor - p) / convert_int_sat(outer_rad - d);
+							cohesion.lo += (neighbor - p);
 							// cohesion.lo += 0;
 						}
 						else{
 							separation.z++;
-							separation.lo += -1 * (p - neighbor) * convert_int_sat(inner_rad - d);
-							//separation.lo += -1 * (p - neighbor); 
+							//separation.lo += -1 * (neighbor - p) * convert_int_sat(inner_rad - d);
+							separation.lo += -1 * (neighbor - p); 
 							// separation.lo += 0; 
 						}
 					}
@@ -68,16 +65,31 @@ __kernel void knn(
 	}
 
 	private int2 intention;
-	intention = (((cohesion.lo / cohesion.z) + (separation.lo / separation.z)) / 2) + c_acc;
+	intention = (((cohesion.lo) + (separation.lo)) / 2);
 	//intention = (cohesion.lo / cohesion.z);
 
-	if ((p.x + intention.x) >= 0 && (p.x + intention.x) < world_size_x && (p.y + intention.y) >= 0 && (p.y + intention.y) < world_size_y){
-		out[gid].s01 = p + intention;
+	int2 a = 0;
+
+	if (v.x > 0 || v.y > 0){
+		if (v.x > 0){
+				a.x = (w * intention.x) / (m * v.x);
+		}
+		if (v.y > 0){
+				a.y = (w * intention.y) / (m * v.y); 
+		}
+	} else {
+		a = (w * intention) / m;
+	}
+
+	v = v + a;
+
+	if ((p.x + v.x) >= 0 && (p.x + v.x) < world_size_x && (p.y + v.y) >= 0 && (p.y + v.y) < world_size_y){
+		out[gid].s01 = p + v;
+		out[gid].s23 = v;
 	} else{
 		out[gid].s01 = p;
 	}
 
-	out[gid].s2 = inner_rad;
-	out[gid].s3 = outer_rad;
-	out[gid].hi = 0;
+	out[gid].s45 = intention;
+	out[gid].s67 = 0;
 }

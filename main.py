@@ -119,7 +119,7 @@ class OpenCl(object):
     def cl_load_data(self, pos, world):
         mf = cl.mem_flags
 
-        world_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=world.flatten());
+        world_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=world.flatten())
 
         pos_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=pos)
 
@@ -136,8 +136,7 @@ class OpenCl(object):
         inner_rad = np.int32(3)
         outer_rad = np.int32(9)
 
-        c_acc_x = np.float32(0)
-        c_acc_y = np.float32(1)
+        constants = np.asarray([0, 0], dtype=np.int32)
 
         ret = np.zeros_like(pos)
 
@@ -148,7 +147,7 @@ class OpenCl(object):
                       pos_cl,
                       world_cl,
                       out,
-                      c_acc_x, c_acc_y,
+                      constants,
                       world_x, world_y,
                       inner_rad, outer_rad
                      )
@@ -161,6 +160,8 @@ class OpenCl(object):
 if __name__ == "__main__":
     sys.settrace
     sys.setrecursionlimit(1024**2)
+
+    #np.set_printoptions(threshold=np.nan)
 
     # num = 1920 * 1080
     # resolution = [1080, 1920]
@@ -191,12 +192,12 @@ if __name__ == "__main__":
     while True:
          draw(world, count)
          print "init"
-         print starlings[:,:2]
+         print starlings[:,:4]
          # starlings = opcl.execute(starlings, world)
          starlings = opcl.execute(starlings, world)
          #starlings = init_data(num, resolution[0], resolution[1])
          print "res"
-         print starlings[:,:2]
+         print starlings[:,:4]
 
         # print world 
          world = form_world(starlings, resolution[0],resolution[1])
