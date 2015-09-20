@@ -37,7 +37,7 @@ __kernel void knn(
 						if (isgreater(d, convert_float(inner_rad)) > 0){
 							cohesion.z++;
 							//cohesion.lo += (neighbor - p) / convert_int_sat(outer_rad - d);
-							cohesion.lo += (neighbor - p);
+							cohesion.lo += 2 * (neighbor - p);
 							// cohesion.lo += 0;
 						}
 						else{
