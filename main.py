@@ -91,7 +91,7 @@ class OpenCl(object):
         
         return population_cl, world_cl, out
 
-    def execute(self, population, world):
+    def execute(self, num, population, world):
         population_cl, world_cl, out = self.cl_load_data(population, world)
 
         world_x = np.int32(world.shape[0])
@@ -105,23 +105,28 @@ class OpenCl(object):
 
         ret = np.zeros_like(population)        
 
-        global_size = ((640 * 480),)
+        global_size = ((num),)
         local_size = None
 
         kernalargs = (
                       population_cl,
                       out,
                       world_cl,
-                      constants,
                       world_x, world_y, world_z,
                       inner_rad, outer_rad
                      )
 
-        self.program.knn(self.queue, global_size, local_size, *(kernalargs)).wait()
+        image_sequence = []
+
+        self.program.knn(self.queue, global_size, local_size, *(kernalargs)) .wait()
         cl.enqueue_read_buffer(self.queue, out, ret)
+
+
+        #supersitious drivel!
         out.release()
         population_cl.release()
         world_cl.release()
+        
         #self.queue.finish()
         return ret
 
@@ -149,9 +154,12 @@ if __name__ == "__main__":
     #num = 1920 * 1080
     #resolution = [1080, 1920, 1920]
 
-    num = 640 * 480
-    resolution = [480, 640, 640]
+    #num = 640 * 480
+    #resolution = [480, 640, 640]
 
+    num = 64 * 64
+    resolution = [480, 640, 640]
+   
     dt = .001
 
     starlings = init_data(num, resolution)
@@ -166,12 +174,12 @@ if __name__ == "__main__":
     while True:
          draw(starlings, resolution, count)
          print "init"
-         print starlings[:,:4]
+         print starlings[:,0:4]
          # starlings = opcl.execute(starlings, world)
-         starlings = opcl.execute(starlings, world)
+         starlings = opcl.execute(num, starlings, world)
          #starlings = init_data(num, resolution[0], resolution[1])
          print "res"
-         print starlings[:,:4]
+         print starlings[:,4:8]
 
         # print world 
          world = form_world(starlings, resolution)

@@ -1,13 +1,32 @@
+#pragma OPENCL EXTENSION cl_khr_3d_image_writes : enable
+
+int4 resolve_direction(
+	int8 metrics
+	)
+{
+ 	private int4 hashed_vector;
+	int3 vector = metrics.s012 - metrics.s345;
+	hashed_vector.s012 = vector;
+	hashed_vector.w = (vector.x * vector.y * vector.z);
+
+	return hashed_vector;
+}
+
 __kernel void knn(
 	__global int8* starling,
 	__global int8* out,
 	image3d_t world,
-	__private int2 constants,
 	int world_size_x, int world_size_y, int world_size_z,
 	int inner_rad, int outer_rad
 	)
 {
+	const sampler_t world_sampler = CLK_NORMALIZED_COORDS_TRUE | CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;;
+	
 	unsigned int gid = get_global_id(0);
+
+	private int search_dimension = ((2 * outer_rad) + 1);
+
+	private int* local_world[27];
 
 	private int3 separation = 0;
 	private int3 cohesion = 0;
@@ -20,6 +39,10 @@ __kernel void knn(
 	private int w = starling[gid].s7;
 
 	private int proxy = 0;
+
+	private int4 vector = resolve_direction(starling[gid]);
+
+
 	for(int i = (-1 * outer_rad);i <= outer_rad; i++){
 		int z = p.z + i;
 		int layer = z * world_size_y * world_size_x;
@@ -30,21 +53,39 @@ __kernel void knn(
 				int x = p.x + j;
 				int column = x;
 
-				int world_pos = layer + row + column;
-				//if (world[world_pos]){
+			//	int world_pos = layer + row + column;
+				int4 world_pos;
+				world_pos.x = x;
+				world_pos.y = y;
+				world_pos.z = z;
+
+				int4 local_world_val = read_imagei(world, world_sampler, world_pos); 
+				local_world_val.x = j;
+				local_world_val.y = k;
+				local_world_val.z = i;
+
+				local_world[local_world_val.x + (local_world_val.y * search_dimension) + (local_world_val.z * search_dimension * search_dimension)] = local_world_val.w; 		
+
+
+			/* I'd like to get this to work - we could write the convolution layers out to images -> numpy arrays -> your-format-here
+			 * but, i can't get 3d images to write! despite the above 'pragma' (nice). This can be returned to.	
+				local_world = write_imagei(local_world, local_world_val, CLK_UNSIGNED_INT8);
+			*/
+
+
+				if (local_world_val.w > 0){
 					if (x >= 0 && x < world_size_x){
 						if (y >= 0 && y < world_size_y){
 							if (z >= 0 && z < world_size_z) {
-								out[gid].s0 = x;
-								out[gid].s1 = y;
-								out[gid].s2 = z;
-								proxy = proxy + 1;
+								out[gid].s0 = local_world_val.w;
 							}
 						}
 					}
-				//}
+				}
 			}
 		}
 	}
-
+	out[gid].s4567 = vector;
+	out[gid].s3 = vector.w;
+	proxy = 0;
 }
