@@ -1,4 +1,4 @@
-import sys
+import sys, time
 
 import pyopencl as cl
 
@@ -81,9 +81,10 @@ class OpenCl(object):
     def cl_load_data(self, population, world):
         mf = cl.mem_flags
 
-        population_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=population)
 
-        out = cl.Buffer(self.ctx, mf.READ_WRITE, population.nbytes)
+        out = cl.Buffer(self.ctx, mf.WRITE_ONLY, population.nbytes)
+
+        population_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=population)
 
 #        world_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=world.flatten())
         world_cl = cl.image_from_array(self.ctx, world, mode="r")
@@ -118,6 +119,9 @@ class OpenCl(object):
 
         self.program.knn(self.queue, global_size, local_size, *(kernalargs)).wait()
         cl.enqueue_read_buffer(self.queue, out, ret)
+        out.release()
+        population_cl.release()
+        world_cl.release()
         #self.queue.finish()
         return ret
 
@@ -157,7 +161,8 @@ if __name__ == "__main__":
     opcl = OpenCl(dt)
 
     count = 0
-    
+   
+
     while True:
          draw(starlings, resolution, count)
          print "init"

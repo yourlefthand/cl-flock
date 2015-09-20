@@ -48,5 +48,5 @@ __kernel void knn(
 		}
 	}
 */
-	out[gid].s0 = 1234;
+	out[gid].s012 = 12;
 }
