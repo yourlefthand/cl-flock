@@ -26,7 +26,7 @@ __kernel void knn(
 
 	private int search_dimension = ((2 * outer_rad) + 1);
 
-	private int* local_world[27];
+	private int* local_world[125];
 
 	private int3 separation = 0;
 	private int3 cohesion = 0;
@@ -77,7 +77,26 @@ __kernel void knn(
 					if (x >= 0 && x < world_size_x){
 						if (y >= 0 && y < world_size_y){
 							if (z >= 0 && z < world_size_z) {
-								out[gid].s0 = local_world_val.w;
+								int8 comparison_vector;
+								comparison_vector.lo = starling[gid].lo;
+								comparison_vector.hi = local_world_val;
+								
+								int4 result_vector = resolve_direction(comparison_vector);
+								proxy = proxy + 1;
+							/* what I need here is an algorithm that can do the following: make an assumption about the direction
+							 * of a neighbor by comparing the hash of it's velocity (vector) to their hashes via the color channel
+							 * of the received image. This is complicated by the fact that I have no idea how to store that info
+							 * in those goddamn image objects and that the hash is so simple it will result in three 'phases' during
+							 * comparison - such that our given comparitor vector is simply rotated and hashed - appearing 
+							 * identical, despite being somehor orthogonal. Still, understanding the period of these phsases
+							 * would allow us to predict those that are facing (thus threatening to collide with) our unit - with
+							 * some modular accuracy. we'll use this 'alignment' calculation to weigh our intended escape vector
+							 * and subsequent power applications. translated into a vector (after casting our die, so to speak)
+							 * we can now calculate position forward one frame, and proceed to update the model
+							 *
+							 */
+
+
 							}
 						}
 					}
@@ -85,7 +104,8 @@ __kernel void knn(
 			}
 		}
 	}
-	out[gid].s4567 = vector;
-	out[gid].s3 = vector.w;
+	out[gid].s012 = p;
+	out[gid].s345 = v;
+	out[gid].s6 = proxy;
 	proxy = 0;
 }

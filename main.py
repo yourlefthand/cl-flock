@@ -99,7 +99,7 @@ class OpenCl(object):
         world_z = np.int32(world.shape[2])
 
         inner_rad = np.int32(1)
-        outer_rad = np.int32(1)
+        outer_rad = np.int32(2)
 
         constants = np.asarray([0, 0], dtype=np.int32)
 
@@ -174,12 +174,12 @@ if __name__ == "__main__":
     while True:
          draw(starlings, resolution, count)
          print "init"
-         print starlings[:,0:4]
+         print starlings[:,0:6]
          # starlings = opcl.execute(starlings, world)
          starlings = opcl.execute(num, starlings, world)
          #starlings = init_data(num, resolution[0], resolution[1])
          print "res"
-         print starlings[:,4:8]
+         print starlings[:,6:8]
 
         # print world 
          world = form_world(starlings, resolution)
