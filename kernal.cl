@@ -20,7 +20,6 @@ __kernel void knn(
 	private int w = starling[gid].s7;
 
 	private int proxy = 0;
-/*
 	for(int i = (-1 * outer_rad);i <= outer_rad; i++){
 		int z = p.z + i;
 		int layer = z * world_size_y * world_size_x;
@@ -47,6 +46,5 @@ __kernel void knn(
 			}
 		}
 	}
-*/
-	out[gid].s012 = 12;
+
 }

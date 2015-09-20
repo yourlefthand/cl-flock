@@ -105,7 +105,7 @@ class OpenCl(object):
 
         ret = np.zeros_like(population)        
 
-        global_size = (population.size,)
+        global_size = ((640 * 480),)
         local_size = None
 
         kernalargs = (
