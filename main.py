@@ -5,97 +5,59 @@ import pyopencl as cl
 import numpy as np
 import scipy.misc as scp
 
-def init_data(num, res_x, res_y):
-    pop = np.zeros((num, 8), dtype=np.int32)
+def init_data(population_size, resolution):
+    population = np.zeros((population_size, 8), dtype=np.int32)
 
-    max_mass = 32
-    max_power = 16
+    max_power = 12
+    max_mass = 36
+
+    res_x = resolution[0]
+    res_y = resolution[1]
+    res_z = resolution[2]
 
     #initial position
-    pop[:,0] = np.arange(num) % res_x
-    pop[:,0] *= np.random.random_sample((num,))
+    population[:,0] = np.arange(num) % res_x
+    population[:,0] *= np.random.random_sample((num,))
 
-    pop[:,1] = np.arange(num) % res_y
-    pop[:,1] *= np.random.random_sample((num,))
+    population[:,1] = np.arange(num) % res_y
+    population[:,1] *= np.random.random_sample((num,))
+
+    population[:,2] = np.arange(num) % res_y
+    population[:,2] *= np.random.random_sample((num,))
 
     #velocity + position provides vector
-    pop[:,2] = 0
-    pop[:,3] = 0
+    population[:,3] = 0
+    population[:,4] = 0
+    population[:,5] = 0
 
     #mass, power randomized? should be part of genome - eventually?
-    pop[:,4] = np.random.randint(1,max_mass,num)[:]
-    pop[:,5] = np.random.randint(1,max_power,num)[:] * pop[:,4]
+    population[:,6] = np.random.randint(1,max_mass,num)[:]
+    population[:,7] = np.random.randint(1,max_power,num)[:] * population[:,4]
 
     #genomic weights to be used as bytestrings
-    pop[:,6] = 0 
-    pop[:,7] = 0
+    #population[:,8:16] = 0 
 
-    return pop
+    return population
 
-def draw(world, count):
-    scp.imsave("./out/image/frame_{0:05d}.png".format(count),world.astype(bool))
+def draw(population, resolution, count):
+    res_x = resolution[0]
+    res_y = resolution[1]
 
-def form_world(accel_vector, x_size, y_size):
-    world = np.zeros((x_size, y_size), dtype=np.int32)
-    world[accel_vector[:,0],accel_vector[:,1]] = 1
+    flat_world = np.zeros((res_x, res_y), dtype=bool)
+    flat_world[population[:,0],population[:,1]] = 1
+    scp.imsave("./out/image/frame_{0:05d}.png".format(count),flat_world.astype(bool))
+
+def form_world(population, resolution):
+    res_x = resolution[0]
+    res_y = resolution[1]
+    res_z = resolution[2]
+
+    world = np.zeros((res_x, res_y, res_z), dtype=bool)
+    world[population[:,0],population[:,1], population[:,2]] = 1
     return world
 
-class KDTree(object):
-    """requires dataset with length of rational sqrt for now"""
-    def __init__(self):
-        self.null = None
-
-    def form_tree(self, data, mins=None, maxs=None):
-        self.data = np.asarray(data)
-
-        assert self.data.shape[1] == 2
-
-        if mins is None:
-            mins = data.min(0)
-        if maxs is None:
-            maxs = data.max(0)
-
-        self.mins = np.asarray(mins)
-        self.maxs = np.asarray(maxs)
-        self.size_s = self.maxs - self.mins
-
-        self.child1 = None
-        self.child2 = None
-
-        if len(data) > 1:
-            # sort on the dimension with the largest spread
-            largest_dim = np.argmax(self.size_s)
-            i_sort = np.argsort(self.data[:, largest_dim])
-            new_data = self.data[i_sort, :]
-
-            # find split point
-            N = new_data.shape[0]
-            split_point = 0.5 * (new_data[N / 2, largest_dim]
-                                 + new_data[N / 2 - 1, largest_dim])
-
-            # create subnodes
-            mins1 = self.mins.copy()
-            mins1[largest_dim] = split_point
-            maxs2 = self.maxs.copy()
-            maxs2[largest_dim] = split_point
-
-            # Recursively build a KD-tree on each sub-node
-            self.child1 = self.form_tree(new_data[N / 2:], mins=mins1, maxs=self.maxs)      
-            self.child2 = self.form_tree(new_data[:N / 2], mins=self.mins, maxs=maxs2)
-
-        return np.asarray([data, self.child1, self.child2])
-
-    def tree(self, data):
-        tree = []
-
-        np.append(tree, self.form_tree(data))
-
-        return tree
-
-
 class OpenCl(object):
-    def __init__(self, num, dt):
-        self.num = num
+    def __init__(self, dt):
         self.dt = dt
 
         self.ctx, self.queue = self.cl_init()
@@ -116,39 +78,42 @@ class OpenCl(object):
         program = cl.Program(self.ctx, fstr).build()
         return program
 
-    def cl_load_data(self, pos, world):
+    def cl_load_data(self, population, world):
         mf = cl.mem_flags
 
         world_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=world.flatten())
 
-        pos_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=pos)
+        population_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=population)
 
-        out = cl.Buffer(self.ctx, mf.WRITE_ONLY, pos.nbytes)
+        out = cl.Buffer(self.ctx, mf.WRITE_ONLY, population.nbytes)
 
-        return pos_cl, world_cl, out
+        return population_cl, world_cl, out
 
-    def execute(self, pos, world):
-        pos_cl, world_cl, out = self.cl_load_data(pos, world)
+    def execute(self, population, world):
+        population_cl, world_cl, out = self.cl_load_data(population, world)
 
         world_x = np.int32(world.shape[0])
         world_y = np.int32(world.shape[1])
+        world_z = np.int32(world.shape[2])
 
         inner_rad = np.int32(3)
         outer_rad = np.int32(9)
 
         constants = np.asarray([0, 0], dtype=np.int32)
 
-        ret = np.zeros_like(pos)
+        ret = np.zeros_like(population)
 
-        global_size = (self.num,)
+        
+
+        global_size = (population.size,)
         local_size = None
 
         kernalargs = (
-                      pos_cl,
+                      population_cl,
                       world_cl,
                       out,
                       constants,
-                      world_x, world_y,
+                      world_x, world_y, world_z,
                       inner_rad, outer_rad
                      )
 
@@ -172,25 +137,30 @@ if __name__ == "__main__":
     # num = 1280 * 720
     # resolution = [720, 1280]
 
-    num = 640 * 480
-    resolution = [480, 640]
+    #num = 640 * 481
+    #resolution = [480, 640]
 
     # num = 64 * 64
     # resolution = [64, 64]
 
+    #num = 1920 * 1080
+    #resolution = [1080, 1920, 1920]
+
+    num = 640 * 480
+    resolution = [480, 640, 640]
+
     dt = .001
 
-    starlings = init_data(num, resolution[0], resolution[1])
-    world = form_world(starlings, resolution[0],resolution[1])
+    starlings = init_data(num, resolution)
+    world = form_world(starlings, resolution)
 
-    print starlings[:,4:6]
 
-    opcl = OpenCl(num, dt)
+    opcl = OpenCl(dt)
 
     count = 0
     
     while True:
-         draw(world, count)
+         draw(starlings, resolution, count)
          print "init"
          print starlings[:,:4]
          # starlings = opcl.execute(starlings, world)
@@ -200,7 +170,7 @@ if __name__ == "__main__":
          print starlings[:,:4]
 
         # print world 
-         world = form_world(starlings, resolution[0],resolution[1])
+         world = form_world(starlings, resolution)
          
          print count
   
