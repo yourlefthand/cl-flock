@@ -52,7 +52,7 @@ def form_world(population, resolution):
     res_y = resolution[1]
     res_z = resolution[2]
 
-    world = np.zeros((res_x, res_y, res_z), dtype=bool)
+    world = np.zeros((res_x, res_y, res_z), dtype=np.int32)
     world[population[:,0],population[:,1], population[:,2]] = 1
     return world
 
@@ -81,12 +81,13 @@ class OpenCl(object):
     def cl_load_data(self, population, world):
         mf = cl.mem_flags
 
-        world_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=world.flatten())
-
         population_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=population)
 
-        out = cl.Buffer(self.ctx, mf.WRITE_ONLY, population.nbytes)
+        out = cl.Buffer(self.ctx, mf.READ_WRITE, population.nbytes)
 
+#        world_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=world.flatten())
+        world_cl = cl.image_from_array(self.ctx, world, mode="r")
+        
         return population_cl, world_cl, out
 
     def execute(self, population, world):
@@ -96,22 +97,20 @@ class OpenCl(object):
         world_y = np.int32(world.shape[1])
         world_z = np.int32(world.shape[2])
 
-        inner_rad = np.int32(3)
-        outer_rad = np.int32(9)
+        inner_rad = np.int32(1)
+        outer_rad = np.int32(1)
 
         constants = np.asarray([0, 0], dtype=np.int32)
 
-        ret = np.zeros_like(population)
-
-        
+        ret = np.zeros_like(population)        
 
         global_size = (population.size,)
         local_size = None
 
         kernalargs = (
                       population_cl,
-                      world_cl,
                       out,
+                      world_cl,
                       constants,
                       world_x, world_y, world_z,
                       inner_rad, outer_rad

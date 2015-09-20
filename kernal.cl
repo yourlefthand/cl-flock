@@ -1,7 +1,7 @@
 __kernel void knn(
 	__global int8* starling,
-	__global bool* world,
 	__global int8* out,
+	image3d_t world,
 	__private int2 constants,
 	int world_size_x, int world_size_y, int world_size_z,
 	int inner_rad, int outer_rad
@@ -20,7 +20,7 @@ __kernel void knn(
 	private int w = starling[gid].s7;
 
 	private int proxy = 0;
-
+/*
 	for(int i = (-1 * outer_rad);i <= outer_rad; i++){
 		int z = p.z + i;
 		int layer = z * world_size_y * world_size_x;
@@ -32,11 +32,21 @@ __kernel void knn(
 				int column = x;
 
 				int world_pos = layer + row + column;
-				
-				out[gid].s0 = x;
-				out[gid].s1 = y;
-				out[gid].s2 = z;
+				//if (world[world_pos]){
+					if (x >= 0 && x < world_size_x){
+						if (y >= 0 && y < world_size_y){
+							if (z >= 0 && z < world_size_z) {
+								out[gid].s0 = x;
+								out[gid].s1 = y;
+								out[gid].s2 = z;
+								proxy = proxy + 1;
+							}
+						}
+					}
+				//}
 			}
 		}
 	}
+*/
+	out[gid].s0 = 1234;
 }
