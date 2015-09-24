@@ -31,8 +31,8 @@ def init_data(population_size, resolution):
     population[:,5] = 0
 
     #mass, power randomized? should be part of genome - eventually?
-    population[:,6] = np.random.randint(1,max_mass,num)[:]
-    population[:,7] = np.random.randint(1,max_power,num)[:] * population[:,4]
+    population[:,6] = 0
+    population[:,7] = 0
 
     #genomic weights to be used as bytestrings
     #population[:,8:16] = 0 
@@ -154,12 +154,16 @@ if __name__ == "__main__":
     #num = 1920 * 1080
     #resolution = [1080, 1920, 1920]
 
-    #num = 640 * 480
-    #resolution = [480, 640, 640]
-
-    num = 64 * 64
+    num = 640 * 480
     resolution = [480, 640, 640]
-   
+
+    #num = 64 * 64
+    #resolution = [480, 640, 640]
+    #resolution = [64, 64, 64]
+
+    #num = 16
+    #resolution = [6, 6, 6]
+
     dt = .001
 
     starlings = init_data(num, resolution)
@@ -179,7 +183,7 @@ if __name__ == "__main__":
          starlings = opcl.execute(num, starlings, world)
          #starlings = init_data(num, resolution[0], resolution[1])
          print "res"
-         print starlings[:,6:8]
+         print starlings[:,0:6]
 
         # print world 
          world = form_world(starlings, resolution)
