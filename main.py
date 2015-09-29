@@ -6,7 +6,7 @@ import numpy as np
 import scipy.misc as scp
 
 def init_data(population_size, resolution):
-    population = np.zeros((population_size, 8), dtype=np.int32)
+    population = np.zeros((population_size, 16), dtype=np.int32)
 
     max_power = 12
     max_mass = 36
@@ -22,7 +22,7 @@ def init_data(population_size, resolution):
     population[:,1] = np.arange(num) % res_y
     population[:,1] *= np.random.random_sample((num,))
 
-    population[:,2] = np.arange(num) % res_y
+    population[:,2] = np.arange(num) % res_z
     population[:,2] *= np.random.random_sample((num,))
 
     #velocity + position provides vector
@@ -35,7 +35,7 @@ def init_data(population_size, resolution):
     population[:,7] = 0
 
     #genomic weights to be used as bytestrings
-    #population[:,8:16] = 0 
+    population[:,8:16] = 0 
 
     return population
 
@@ -98,8 +98,8 @@ class OpenCl(object):
         world_y = np.int32(world.shape[1])
         world_z = np.int32(world.shape[2])
 
-        inner_rad = np.int32(1)
-        outer_rad = np.int32(2)
+        inner_rad = np.int32(8)
+        outer_rad = np.int32(9)
 
         constants = np.asarray([0, 0], dtype=np.int32)
 
@@ -134,10 +134,10 @@ if __name__ == "__main__":
     sys.settrace
     sys.setrecursionlimit(1024**2)
 
-    #np.set_printoptions(threshold=np.nan)
+    np.set_printoptions(threshold=np.nan, linewidth=512)
 
-    # num = 1920 * 1080
-    # resolution = [1080, 1920]
+    #num = 1920 * 1200
+    #resolution = [1200, 1920, 64]
 
     # num = 1024**2
     # resolution = [1024,1024]
@@ -151,18 +151,21 @@ if __name__ == "__main__":
     # num = 64 * 64
     # resolution = [64, 64]
 
-    #num = 1920 * 1080
-    #resolution = [1080, 1920, 1920]
-
-    num = 640 * 480
-    resolution = [480, 640, 640]
-
-    #num = 64 * 64
-    #resolution = [480, 640, 640]
-    #resolution = [64, 64, 64]
-
     #num = 16
-    #resolution = [6, 6, 6]
+    #resolution = [16, 16, 1]
+
+    #num = 640 * 480
+    #resolution = [480, 640, 18]
+
+    num = 64 * 64
+    #resolution = [480, 640, 640]
+    resolution = [64, 64, 9]
+
+    #num = 32
+    #resolution = [32, 32, 32]
+
+    #num = 6 * 6 * 1
+    #resolution = [6, 6, 1]
 
     dt = .001
 
@@ -183,8 +186,18 @@ if __name__ == "__main__":
          starlings = opcl.execute(num, starlings, world)
          #starlings = init_data(num, resolution[0], resolution[1])
          print "res"
+         print "position/velocity"
          print starlings[:,0:6]
-
+         print "cohesion"
+         print starlings[:,6:9]
+         print "separation"
+         print starlings[:,9:12]
+         print "observed"
+         print starlings[:,12]
+         print "coheded"
+         print starlings[:,13]
+         print "separated"
+         print starlings[:,14]
         # print world 
          world = form_world(starlings, resolution)
          

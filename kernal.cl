@@ -1,14 +1,13 @@
 #pragma OPENCL EXTENSION cl_khr_3d_image_writes : enable
 
+const sampler_t world_sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_REPEAT | CLK_FILTER_NEAREST;
+
 int4 resolve_difference(
-	int8 metrics
+	int4 a_vec,
+	int4 b_vec
 	)
 {
- 	private int4 difference_vector;
-	int3 vector = metrics.s012 - metrics.s345;
-	difference_vector.s012 = vector;
-
-	//difference_vector.w = hashed vector direction base 255
+ 	private int4 difference_vector = a_vec - b_vec;
 
 	return difference_vector;
 }
@@ -86,36 +85,36 @@ int3 check_border(
 
 
 __kernel void knn(
-	__global int8* starling,
-	__global int8* out,
+	__global int16* starling,
+	__global int16* out,
 	image3d_t world,
 	int world_size_x, int world_size_y, int world_size_z,
 	int inner_rad, int outer_rad
 	)
-{
-	const sampler_t world_sampler = CLK_NORMALIZED_COORDS_TRUE | CLK_ADDRESS_CLAMP | CLK_FILTER_NEAREST;;
-	
+{	
 	unsigned int gid = get_global_id(0);
 
 	private int search_dimension = ((2 * outer_rad) + 1);
 
 	private int* local_world[125];
 
-	private int4 intention = 0;	
-
-	private int3 separation = 0;
-	private int3 cohesion = 0;
 //	private int3 alignment = 0;
 
-	private int3 p = starling[gid].s012;
-	private int3 v = starling[gid].s345;
+	private int4 p;
+	p.s012 = starling[gid].s012;
+	private int4 v;
+	v.s012 = 0; //starling[gid].s012;
 
 	private int m = starling[gid].s6;
 	private int w = starling[gid].s7;
 
-	private int proxy = 0;
+	private int seen = 0;
+	private int coheded = 0;
+	private int separated = 0;
 
-	private int4 direction = resolve_difference(starling[gid]);
+	private int4 direction = resolve_difference(p, v);
+	private float4 separation = 0;
+	private float4 cohesion = 0;
 
 
 	for(int i = (-1 * outer_rad);i <= outer_rad; i++){
@@ -134,10 +133,13 @@ __kernel void knn(
 				world_pos.y = y;
 				world_pos.z = z;
 
-				int4 local_world_pos = read_imagei(world, world_sampler, world_pos); 
+				int4 local_world_pos = 0; 
 				local_world_pos.x = j;
 				local_world_pos.y = k;
 				local_world_pos.z = i;
+
+				//it's an RGBA color object dummy! I was overwriting it this whole time because of some stupid assumption I made...duh!
+				int4 image_read = read_imagei(world, world_sampler, world_pos);
 
 			//	local_world[local_world_pos.x + (local_world_pos.y * search_dimension) + (local_world_pos.z * search_dimension * search_dimension)] = local_world_pos.w; 		
 
@@ -148,58 +150,59 @@ __kernel void knn(
 			*/
 
 
-				if (local_world_pos.w > 0){
-					if (x >= 0 && x < world_size_x){
-						if (y >= 0 && y < world_size_y){
-							if (z >= 0 && z < world_size_z) {
-								int8 comparison_vector;
-								comparison_vector.lo = starling[gid].lo;
-								comparison_vector.hi = world_pos;
-								
-								int4 difference_vector = resolve_difference(comparison_vector);
-				
-								float local_dist = f_distance(comparison_vector.s012, world_pos.s012);
-								float local_dot = f_dot(direction.s012, difference_vector.s012);
+				if (image_read.x > 0){
+					if (x != 0 && y !=0 && z != 0){
+						if (x >= 0 && x < world_size_x){
+							if (y >= 0 && y < world_size_y){
+								if (z >= 0 && z < world_size_z) {
+									int4 difference_vector = resolve_difference(world_pos, p);
+									float4 f_difference_vector = convert_float(difference_vector);
+					
+									float local_dist = f_distance(p.s012, world_pos.s012);
+									float local_dot = f_dot(direction.s012, difference_vector.s012);
 
-								int local_dot_i = convert_int(local_dot);
+									int local_dot_i = convert_int(local_dot);
 
-								// here we have 'cohesion and separation' conditions
-								// it would be nice to translate this into a single function --- hm, a sigmoid?!
-								// if I could add signal passing to this, I'd have a neural layer!!! not only that, but a layer
-								// for analyzing matrices of data **convolutionally** (i.e. framed)
-								// it'd be interesting to return to the perceptron capabilities in that Minsky & Papert i.e.
-								// optimizing search pattern - check this out: http://danielrapp.github.io/morph/ for generative
-								// lensing!
-								//
-								// turning this switch into a lambda with emittable values will make all the difference.
-								// at the moment- perhaps this will change - we will want to keep 'moving' the target value a la
-								// simulation - this data stream will be passed to a time-dilation layer - genetic memory
-								if (islessequal(local_dist, (float) outer_rad) != 0) {
-									if (isgreater(local_dist, (float) inner_rad) != 0) {
-										// searched point is in that outer zones of the target's perception
-										intention.w = intention.w + 1;
-										intention = intention + local_world_pos;
-									} else {
-										// searched pont is within the outer zone of the target's perception
-									}	
+									// here we have 'cohesion and separation' conditions
+									// it would be nice to translate this into a single function --- hm, a sigmoid?!
+									// if I could add signal passing to this, I'd have a neural layer!!! not only that, but a layer
+									// for analyzing matrices of data **convolutionally** (i.e. framed)
+									// it'd be interesting to return to the perceptron capabilities in that Minsky & Papert i.e.
+									// optimizing search pattern - check this out: http://danielrapp.github.io/morph/ for generative
+									// lensing!
+									//
+									// turning this switch into a lambda with emittable values will make all the difference.
+									// at the moment- perhaps this will change - we will want to keep 'moving' the target value a la
+									// simulation - this data stream will be passed to a time-dilation layer - genetic memory
+									if (islessequal(local_dist, (float) outer_rad) != 0) {
+										if (isgreater(local_dist, (float) inner_rad) != 0) {
+											// searched point is in that outer zones of the target's perception
+											cohesion = cohesion + f_difference_vector;
+											coheded = coheded + 1;
+										} else {
+											// searched pont is within the outer zone of the target's perception
+											separation = separation + f_difference_vector;
+											separated = separated + 1;
+										}	
+									}
+
+									//seen = seen + 1;
+
+								/* what I need here is an algorithm that can do the following: make an assumption about the direction
+								 * of a neighbor by comparing the hash of it's velocity (vector) to their hashes via the color channel
+								 * of the received image. This is complicated by the fact that I have no idea how to store that info
+								 * in those goddamn image objects and that the hash is so simple it will result in three 'phases' during
+								 * comparison - such that our given comparitor vector is simply rotated and hashed - appearing 
+								 * identical, despite being somehor orthogonal. Still, understanding the period of these phsases
+								 * would allow us to predict those that are facing (thus threatening to collide with) our unit - with
+								 * some modular accuracy. we'll use this 'alignment' calculation to weigh our intended escape vector
+								 * and subsequent power applications. translated into a vector (after casting our die, so to speak)
+								 * we can now calculate position forward one frame, and proceed to update the model
+								 *
+								 */
+
+
 								}
-
-								proxy = proxy + 1;
-
-							/* what I need here is an algorithm that can do the following: make an assumption about the direction
-							 * of a neighbor by comparing the hash of it's velocity (vector) to their hashes via the color channel
-							 * of the received image. This is complicated by the fact that I have no idea how to store that info
-							 * in those goddamn image objects and that the hash is so simple it will result in three 'phases' during
-							 * comparison - such that our given comparitor vector is simply rotated and hashed - appearing 
-							 * identical, despite being somehor orthogonal. Still, understanding the period of these phsases
-							 * would allow us to predict those that are facing (thus threatening to collide with) our unit - with
-							 * some modular accuracy. we'll use this 'alignment' calculation to weigh our intended escape vector
-							 * and subsequent power applications. translated into a vector (after casting our die, so to speak)
-							 * we can now calculate position forward one frame, and proceed to update the model
-							 *
-							 */
-
-
 							}
 						}
 					}
@@ -208,7 +211,7 @@ __kernel void knn(
 		}
 	}
 //	out[gid].s012 = check_border(world_size_x, world_size_y, world_size_z, (p + (intention.s012 / intention.s3)));
-	private int3 desire = p + proxy;
+	private int4 desire = p + convert_int((cohesion / coheded) - (separation / separated));
 	//there has to be a better way
 	if (desire.x < 0) {
 		desire.x = world_size_x + desire.x;
@@ -231,8 +234,15 @@ __kernel void knn(
 		desire.z = desire.z % world_size_z;
 	}
 
-	out[gid].s012 = desire;
-	out[gid].s345 = p;
-	out[gid].s6 = proxy;
-	proxy = 0;
+	out[gid].s012 = desire.s012;
+	out[gid].s345 = direction.s012;
+	out[gid].s678 = convert_int(cohesion.s012);
+	out[gid].s9ab = convert_int(separation.s012);
+	out[gid].sc = seen;
+	out[gid].sd = coheded;
+	out[gid].se = separated;
+	
+	seen = 0;
+	coheded = 0;
+	separated = 0;
 }
