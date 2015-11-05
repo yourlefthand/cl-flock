@@ -25,14 +25,16 @@ def init_data(population_size, resolution):
     population[:,2] = np.arange(num) % res_z
     population[:,2] *= np.random.random_sample((num,))
 
-    #velocity + position provides vector
+    #velocity + position provides vector - i.e. initial debt
     population[:,3] = 0
     population[:,4] = 0
     population[:,5] = 0
 
     #mass, power randomized? should be part of genome - eventually?
-    population[:,6] = 0
-    population[:,7] = 0
+    population[:,6] = np.arange(num) % max_mass
+    population[:,6] *= np.random.random_sample((num,))
+    population[:,7] = np.arange(num) % max_power
+    population[:,7] *= np.random.random_sample((num,))
 
     #genomic weights to be used as bytestrings
     population[:,8:16] = 0 

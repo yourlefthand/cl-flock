@@ -105,9 +105,6 @@ __kernel void knn(
 	private int4 v;
 	v.s012 = starling[gid].s345;
 
-	private int m = starling[gid].s6;
-	private int w = starling[gid].s7;
-
 	private int seen = 0;
 	private int coheded = 1;
 	private int separated = 1;
@@ -224,35 +221,45 @@ __kernel void knn(
 //	out[gid].s012 = check_border(world_size_x, world_size_y, world_size_z, (p + (intention.s012 / intention.s3)));
 	private int4 desire = p + convert_int((cohesion / coheded) - (separation / separated));
 	//there has to be a better way
-	if (desire.x < 0) {
-		desire.x = world_size_x + (desire.x % world_size_x);
+
+	private int m = starling[gid].s6;
+	private int l = starling[gid].s7;
+
+	int4 accel_frame = (l / m) * desire;
+
+	int3 velocity = starling[gid].s345 + accel_frame.s012;
+
+	int3 position = p.s012 + velocity;
+
+	if (position.x < 0) {
+		position.x = world_size_x + (position.x % world_size_x);
 	}
-	if (desire.x > world_size_x - 1){
-		desire.x = desire.x % world_size_x;
+	if (position.x > world_size_x - 1){
+		position.x = position.x % world_size_x;
 	}
 
-	if (desire.y < 0) {
-		desire.y = world_size_y + (desire.y % world_size_y);
+	if (position.y < 0) {
+		position.y = world_size_y + (position.y % world_size_y);
 	}
-	if (desire.y > world_size_y - 1){
-		desire.y = desire.y % world_size_y;;
-	}
-
-	if (desire.z < 0) {
-		desire.z = world_size_z + (desire.z % world_size_z);
-	}
-	if (desire.z > world_size_z - 1){
-		desire.z = desire.z % world_size_z;
+	if (position.y > world_size_y - 1){
+		position.y = position.y % world_size_y;;
 	}
 
-	out[gid].s012 = desire.s012;
-	out[gid].s345 = direction.s012;
+	if (position.z < 0) {
+		position.z = world_size_z + (position.z % world_size_z);
+	}
+	if (position.z > world_size_z - 1){
+		position.z = position.z % world_size_z;
+	}
+
+	out[gid].s012 = position;
+	out[gid].s345 = velocity;
 	// out[gid].s678 = convert_int(cohesion.s012);
 	// out[gid].s9ab = convert_int(separation.s012);
 	// out[gid].sc = seen;
 	// out[gid].sd = coheded;
 	// out[gid].se = separated;
-	
+
 	// out[gid].sc = get_image_width(world);
 	// out[gid].sd = get_image_height(world);
 	// out[gid].se = get_image_depth(world);
