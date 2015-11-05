@@ -116,24 +116,27 @@ __kernel void knn(
 	private float4 separation = 0;
 	private float4 cohesion = 0;
 
-	int4 image_read_out = 0;
-
 
 	for(int i = (-1 * outer_rad);i <= outer_rad; i++){
-		int z = p.z + (i % world_size_z);
+		int z = (p.z + i) % world_size_z;
 		int layer = z * world_size_y * world_size_x;
 		for(int k = (-1 * outer_rad); k <= outer_rad; k++){
-			int y = p.y + (k % world_size_y);
+			int y = (p.y + k) % world_size_y;
 			int row = y * world_size_x;	
 			for(int j = (-1 * outer_rad); j <= outer_rad; j++){
-				int x = p.x + (j % world_size_x);
+				int x = (p.x + j) % world_size_x;
 				int column = x;
 
 			//	int world_pos = layer + row + column;
 				int4 world_pos;
-				world_pos.x = z;
+				world_pos.x = x;
 				world_pos.y = y;
-				world_pos.z = x;
+				world_pos.z = z;
+
+				int4 image_read_out;
+				image_read_out.x = z;
+				image_read_out.y = y;
+				image_read_out.z = x;
 
 				int4 local_world_pos = 0; 
 				local_world_pos.x = j;
@@ -141,7 +144,7 @@ __kernel void knn(
 				local_world_pos.z = i;
 
 				//it's an RGBA color object dummy! I was overwriting it this whole time because of some stupid assumption I made...duh!
-				int4 image_read = read_imagei(world, world_sampler, world_pos);
+				int4 image_read = read_imagei(world, world_sampler, image_read_out);
 
 			//	local_world[local_world_pos.x + (local_world_pos.y * search_dimension) + (local_world_pos.z * search_dimension * search_dimension)] = local_world_pos.w; 		
 
@@ -156,8 +159,6 @@ __kernel void knn(
 			 // 
 
 				if (image_read.x > 0){
-
-					image_read_out = world_pos;
 
 					//if (x != 0 && y !=0 && z != 0){
 						// if (x >= 0 && x < world_size_x){
@@ -251,7 +252,7 @@ __kernel void knn(
 	// out[gid].sc = seen;
 	// out[gid].sd = coheded;
 	// out[gid].se = separated;
-    out[gid].scde = image_read_out.s012;
+	
 	// out[gid].sc = get_image_width(world);
 	// out[gid].sd = get_image_height(world);
 	// out[gid].se = get_image_depth(world);

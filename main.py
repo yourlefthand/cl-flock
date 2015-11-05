@@ -98,8 +98,8 @@ class OpenCl(object):
         world_y = np.int32(world.shape[1])
         world_z = np.int32(world.shape[2])
 
-        inner_rad = np.int32(8)
-        outer_rad = np.int32(9)
+        inner_rad = np.int32(32)
+        outer_rad = np.int32(36)
 
         constants = np.asarray([0, 0], dtype=np.int32)
 
@@ -134,7 +134,7 @@ if __name__ == "__main__":
     sys.settrace
     sys.setrecursionlimit(1024**2)
 
-    np.set_printoptions(threshold=np.nan, linewidth=512)
+    #np.set_printoptions(threshold=np.nan, linewidth=512)
 
     #num = 1920 * 1200
     #resolution = [1200, 1920, 64]
@@ -157,9 +157,9 @@ if __name__ == "__main__":
     #num = 640 * 480
     #resolution = [480, 640, 18]
 
-    num = 64 * 64
-    #resolution = [480, 640, 640]
-    resolution = [64, 64, 9]
+    num = 480 * 640
+    resolution = [480, 640, 1]
+    #resolution = [64, 64, 9]
 
     #num = 32
     #resolution = [32, 32, 32]
@@ -180,27 +180,27 @@ if __name__ == "__main__":
 
     while True:
          draw(starlings, resolution, count)
-         print "init"
-         print starlings[:,0:6]
+         # print "init"
+         # print starlings[:,0:6]
          # starlings = opcl.execute(starlings, world)
          starlings = opcl.execute(num, starlings, world)
          #starlings = init_data(num, resolution[0], resolution[1])
-         print "res"
-         print "position/velocity"
-         print starlings[:,0:6]
-         print "cohesion"
-         print starlings[:,6:9]
-         print "separation"
-         print starlings[:,9:12]
-         print "observed"
-         print starlings[:,12]
-         print "coheded"
-         print starlings[:,13]
-         print "separated"
-         print starlings[:,14]
+         # print "res"
+         # print "position/velocity"
+         # print starlings[:,0:6]
+         # print "cohesion"
+         # print starlings[:,6:9]
+         # print "separation"
+         # print starlings[:,9:12]
+         # print "observed"
+         # print starlings[:,12]
+         # print "coheded"
+         # print starlings[:,13]
+         # print "separated"
+         # print starlings[:,14]
         # print world 
          world = form_world(starlings, resolution)
          
-         print count
+         print "frame: " + str(count)
   
          count += 1
