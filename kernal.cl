@@ -1,6 +1,6 @@
 #pragma OPENCL EXTENSION cl_khr_3d_image_writes : enable
 
-const sampler_t world_sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_REPEAT | CLK_FILTER_NEAREST;
+const sampler_t world_sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_NEAREST;
 
 int4 resolve_difference(
 	int4 a_vec,
@@ -103,35 +103,37 @@ __kernel void knn(
 	private int4 p;
 	p.s012 = starling[gid].s012;
 	private int4 v;
-	v.s012 = 0; //starling[gid].s012;
+	v.s012 = starling[gid].s345;
 
 	private int m = starling[gid].s6;
 	private int w = starling[gid].s7;
 
 	private int seen = 0;
-	private int coheded = 0;
-	private int separated = 0;
+	private int coheded = 1;
+	private int separated = 1;
 
 	private int4 direction = resolve_difference(p, v);
 	private float4 separation = 0;
 	private float4 cohesion = 0;
 
+	int4 image_read_out = 0;
+
 
 	for(int i = (-1 * outer_rad);i <= outer_rad; i++){
-		int z = p.z + i;
+		int z = p.z + (i % world_size_z);
 		int layer = z * world_size_y * world_size_x;
 		for(int k = (-1 * outer_rad); k <= outer_rad; k++){
-			int y = p.y + k;
+			int y = p.y + (k % world_size_y);
 			int row = y * world_size_x;	
 			for(int j = (-1 * outer_rad); j <= outer_rad; j++){
-				int x = p.x + j;
+				int x = p.x + (j % world_size_x);
 				int column = x;
 
 			//	int world_pos = layer + row + column;
 				int4 world_pos;
-				world_pos.x = x;
+				world_pos.x = z;
 				world_pos.y = y;
-				world_pos.z = z;
+				world_pos.z = x;
 
 				int4 local_world_pos = 0; 
 				local_world_pos.x = j;
@@ -144,17 +146,23 @@ __kernel void knn(
 			//	local_world[local_world_pos.x + (local_world_pos.y * search_dimension) + (local_world_pos.z * search_dimension * search_dimension)] = local_world_pos.w; 		
 
 
-			/* I'd like to get this to work - we could write the convolution layers out to images -> numpy arrays -> your-format-here
+			/* 
+			 * I'd like to get this to work - we could write the convolution layers out to images -> numpy arrays -> your-format-here
 			 * but, i can't get 3d images to write! despite the above 'pragma' (nice). This can be returned to.	
-				local_world = write_imagei(local_world, local_world_pos, CLK_UNSIGNED_INT8);
-			*/
+			 * local_world = write_imagei(local_world, local_world_pos, CLK_UNSIGNED_INT8);
+			 */
 
+			 // it seems that there is some plane of values that we can catch, otherwise we miss
+			 // 
 
 				if (image_read.x > 0){
-					if (x != 0 && y !=0 && z != 0){
-						if (x >= 0 && x < world_size_x){
-							if (y >= 0 && y < world_size_y){
-								if (z >= 0 && z < world_size_z) {
+
+					image_read_out = world_pos;
+
+					//if (x != 0 && y !=0 && z != 0){
+						// if (x >= 0 && x < world_size_x){
+						// 	if (y >= 0 && y < world_size_y){
+						// 		if (z >= 0 && z < world_size_z) {
 									int4 difference_vector = resolve_difference(world_pos, p);
 									float4 f_difference_vector = convert_float(difference_vector);
 					
@@ -163,17 +171,19 @@ __kernel void knn(
 
 									int local_dot_i = convert_int(local_dot);
 
-									// here we have 'cohesion and separation' conditions
-									// it would be nice to translate this into a single function --- hm, a sigmoid?!
-									// if I could add signal passing to this, I'd have a neural layer!!! not only that, but a layer
-									// for analyzing matrices of data **convolutionally** (i.e. framed)
-									// it'd be interesting to return to the perceptron capabilities in that Minsky & Papert i.e.
-									// optimizing search pattern - check this out: http://danielrapp.github.io/morph/ for generative
-									// lensing!
-									//
-									// turning this switch into a lambda with emittable values will make all the difference.
-									// at the moment- perhaps this will change - we will want to keep 'moving' the target value a la
-									// simulation - this data stream will be passed to a time-dilation layer - genetic memory
+									/* 
+									 * here we have 'cohesion and separation' conditions
+									 * it would be nice to translate this into a single function --- hm, a sigmoid?!
+									 * if I could add signal passing to this, I'd have a neural layer!!! not only that, but a layer
+									 * for analyzing matrices of data **convolutionally** (i.e. framed)
+									 * it'd be interesting to return to the perceptron capabilities in that Minsky & Papert i.e.
+									 * optimizing search pattern - check this out: http://danielrapp.github.io/morph/ for generative
+									 * lensing!
+									 * 
+									 * turning this switch into a lambda with emittable values will make all the difference.
+									 * at the moment- perhaps this will change - we will want to keep 'moving' the target value a la
+									 * simulation - this data stream will be passed to a time-dilation layer - genetic memory
+									 */
 									if (islessequal(local_dist, (float) outer_rad) != 0) {
 										if (isgreater(local_dist, (float) inner_rad) != 0) {
 											// searched point is in that outer zones of the target's perception
@@ -186,9 +196,10 @@ __kernel void knn(
 										}	
 									}
 
-									//seen = seen + 1;
+									seen = seen + 1;
 
-								/* what I need here is an algorithm that can do the following: make an assumption about the direction
+								/* 
+								 * what I need here is an algorithm that can do the following: make an assumption about the direction
 								 * of a neighbor by comparing the hash of it's velocity (vector) to their hashes via the color channel
 								 * of the received image. This is complicated by the fact that I have no idea how to store that info
 								 * in those goddamn image objects and that the hash is so simple it will result in three 'phases' during
@@ -198,14 +209,13 @@ __kernel void knn(
 								 * some modular accuracy. we'll use this 'alignment' calculation to weigh our intended escape vector
 								 * and subsequent power applications. translated into a vector (after casting our die, so to speak)
 								 * we can now calculate position forward one frame, and proceed to update the model
-								 *
 								 */
 
 
-								}
-							}
-						}
-					}
+						// 		}
+						// 	}
+						// }
+					//}
 				}
 			}
 		}
@@ -214,21 +224,21 @@ __kernel void knn(
 	private int4 desire = p + convert_int((cohesion / coheded) - (separation / separated));
 	//there has to be a better way
 	if (desire.x < 0) {
-		desire.x = world_size_x + desire.x;
+		desire.x = world_size_x + (desire.x % world_size_x);
 	}
 	if (desire.x > world_size_x - 1){
 		desire.x = desire.x % world_size_x;
 	}
 
 	if (desire.y < 0) {
-		desire.y = world_size_y + desire.y;
+		desire.y = world_size_y + (desire.y % world_size_y);
 	}
 	if (desire.y > world_size_y - 1){
 		desire.y = desire.y % world_size_y;;
 	}
 
 	if (desire.z < 0) {
-		desire.z = world_size_z + desire.z ;
+		desire.z = world_size_z + (desire.z % world_size_z);
 	}
 	if (desire.z > world_size_z - 1){
 		desire.z = desire.z % world_size_z;
@@ -236,11 +246,15 @@ __kernel void knn(
 
 	out[gid].s012 = desire.s012;
 	out[gid].s345 = direction.s012;
-	out[gid].s678 = convert_int(cohesion.s012);
-	out[gid].s9ab = convert_int(separation.s012);
-	out[gid].sc = seen;
-	out[gid].sd = coheded;
-	out[gid].se = separated;
+	// out[gid].s678 = convert_int(cohesion.s012);
+	// out[gid].s9ab = convert_int(separation.s012);
+	// out[gid].sc = seen;
+	// out[gid].sd = coheded;
+	// out[gid].se = separated;
+    out[gid].scde = image_read_out.s012;
+	// out[gid].sc = get_image_width(world);
+	// out[gid].sd = get_image_height(world);
+	// out[gid].se = get_image_depth(world);
 	
 	seen = 0;
 	coheded = 0;
