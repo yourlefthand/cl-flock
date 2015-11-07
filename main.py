@@ -8,8 +8,8 @@ import scipy.misc as scp
 def init_data(population_size, resolution):
     population = np.zeros((population_size, 16), dtype=np.int32)
 
-    max_power = 12
-    max_mass = 36
+    max_power = 2
+    max_mass = 3
 
     res_x = resolution[0]
     res_y = resolution[1]
@@ -31,10 +31,8 @@ def init_data(population_size, resolution):
     population[:,5] = 0
 
     #mass, power randomized? should be part of genome - eventually?
-    population[:,6] = np.arange(num) % max_mass
-    population[:,6] *= np.random.random_sample((num,))
-    population[:,7] = np.arange(num) % max_power
-    population[:,7] *= np.random.random_sample((num,))
+    population[:,6] = max_mass
+    population[:,7] = max_power
 
     #genomic weights to be used as bytestrings
     population[:,8:16] = 0 
@@ -136,7 +134,7 @@ if __name__ == "__main__":
     sys.settrace
     sys.setrecursionlimit(1024**2)
 
-    #np.set_printoptions(threshold=np.nan, linewidth=512)
+    # np.set_printoptions(threshold=np.nan, linewidth=512)
 
     #num = 1920 * 1200
     #resolution = [1200, 1920, 64]
@@ -159,7 +157,7 @@ if __name__ == "__main__":
     #num = 640 * 480
     #resolution = [480, 640, 18]
 
-    num = 480 * 640
+    num = 640 * 480
     resolution = [480, 640, 1]
     #resolution = [64, 64, 9]
 
@@ -189,7 +187,7 @@ if __name__ == "__main__":
          #starlings = init_data(num, resolution[0], resolution[1])
          # print "res"
          # print "position/velocity"
-         # print starlings[:,0:6]
+         # print starlings[:,0:15]
          # print "cohesion"
          # print starlings[:,6:9]
          # print "separation"

@@ -143,6 +143,8 @@ __kernel void knn(
 				//it's an RGBA color object dummy! I was overwriting it this whole time because of some stupid assumption I made...duh!
 				int4 image_read = read_imagei(world, world_sampler, image_read_out);
 
+				delete(image_read_out);
+
 			//	local_world[local_world_pos.x + (local_world_pos.y * search_dimension) + (local_world_pos.z * search_dimension * search_dimension)] = local_world_pos.w; 		
 
 
@@ -219,17 +221,29 @@ __kernel void knn(
 		}
 	}
 //	out[gid].s012 = check_border(world_size_x, world_size_y, world_size_z, (p + (intention.s012 / intention.s3)));
-	private int4 desire = p + convert_int((cohesion / coheded) - (separation / separated));
+	// private int4 desire = p + convert_int((cohesion / coheded) - (separation / separated));
+
+	private float4 desire = convert_float(p) + ((cohesion / coheded) - (separation / separated));
 	//there has to be a better way
 
-	private int m = starling[gid].s6;
-	private int l = starling[gid].s7;
+	int m = starling[gid].s6;
+	int l = starling[gid].s7;
 
-	int4 accel_frame = (l / m) * desire;
+	float3 accel_frame = 0;
+	int3 velocity = 0;
+	int3 position = 0;
 
-	int3 velocity = starling[gid].s345 + accel_frame.s012;
+	int3 desire_debug = convert_int_rtz(desire.s012);
 
-	int3 position = p.s012 + velocity;
+	accel_frame = convert_float(l) / convert_float(m) * desire.s012;
+
+	int3 accel_frame_debug = convert_int_rtz(accel_frame);
+
+	//velocity = (starling[gid].s345 + convert_int_rtz(accel_frame.s012)) % (world_size_x / 2);
+
+	//position = p.s012 + velocity;
+
+    position = convert_int_rtz(desire.s012);
 
 	if (position.x < 0) {
 		position.x = world_size_x + (position.x % world_size_x);
@@ -253,8 +267,14 @@ __kernel void knn(
 	}
 
 	out[gid].s012 = position;
+
 	out[gid].s345 = velocity;
-	// out[gid].s678 = convert_int(cohesion.s012);
+
+	out[gid].s6 = m;
+	out[gid].s7 = l;
+
+	out[gid].s9ab = accel_frame_debug;
+	out[gid].scde = desire_debug;
 	// out[gid].s9ab = convert_int(separation.s012);
 	// out[gid].sc = seen;
 	// out[gid].sd = coheded;
