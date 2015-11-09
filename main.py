@@ -2,14 +2,16 @@ import sys, time
 
 import pyopencl as cl
 
+import tables
+
 import numpy as np
 import scipy.misc as scp
 
 def init_data(population_size, resolution):
     population = np.zeros((population_size, 16), dtype=np.int32)
 
-    max_power = 2
-    max_mass = 3
+    max_power = 4
+    max_mass = 12
 
     res_x = resolution[0]
     res_y = resolution[1]
@@ -31,8 +33,13 @@ def init_data(population_size, resolution):
     population[:,5] = 0
 
     #mass, power randomized? should be part of genome - eventually?
-    population[:,6] = max_mass
-    population[:,7] = max_power
+    population[:,6] = np.arange(num) % (max_mass - 1)
+    population[:,6] *= np.random.random_sample((num,))
+    population[:,6] += 1
+
+    population[:,7] = np.arange(num) % (max_power - 1)
+    population[:,7] *= np.random.random_sample((num,))
+    population[:,7] += 1
 
     #genomic weights to be used as bytestrings
     population[:,8:16] = 0 
@@ -55,6 +62,19 @@ def form_world(population, resolution):
     world = np.zeros((res_x, res_y, res_z), dtype=np.int32)
     world[population[:,0],population[:,1], population[:,2]] = 1
     return world
+
+def save_as_hd5(population, resolution):
+    h5_out = tables.open_file('./starlings.h5', mode='w', title="Starlings")
+    root = ht_out.root
+    h5_out.create_array(root, "population", population)
+    h5_out.create_array(root, "resolution", resolution)
+    h5_out.close()
+    
+def read_from_hd5():
+    h5_in = tables.open_file('./starlings.h5', mode='r')
+    population = h5_in.get_node("population").read()
+    resolution = h5_in.get_node("resolution").read()
+    return population, resolution
 
 class OpenCl(object):
     def __init__(self, dt):
@@ -134,7 +154,7 @@ if __name__ == "__main__":
     sys.settrace
     sys.setrecursionlimit(1024**2)
 
-    # np.set_printoptions(threshold=np.nan, linewidth=512)
+    #np.set_printoptions(threshold=np.nan, linewidth=512)
 
     #num = 1920 * 1200
     #resolution = [1200, 1920, 64]
@@ -154,11 +174,11 @@ if __name__ == "__main__":
     #num = 16
     #resolution = [16, 16, 1]
 
-    #num = 640 * 480
-    #resolution = [480, 640, 18]
-
     num = 640 * 480
     resolution = [480, 640, 1]
+
+    # num = 64 * 64
+    # resolution = [64, 64, 1]
     #resolution = [64, 64, 9]
 
     #num = 32
@@ -179,28 +199,35 @@ if __name__ == "__main__":
    
 
     while True:
-         draw(starlings, resolution, count)
-         # print "init"
-         # print starlings[:,0:6]
-         # starlings = opcl.execute(starlings, world)
-         starlings = opcl.execute(num, starlings, world)
-         #starlings = init_data(num, resolution[0], resolution[1])
-         # print "res"
-         # print "position/velocity"
-         # print starlings[:,0:15]
-         # print "cohesion"
-         # print starlings[:,6:9]
-         # print "separation"
-         # print starlings[:,9:12]
-         # print "observed"
-         # print starlings[:,12]
-         # print "coheded"
-         # print starlings[:,13]
-         # print "separated"
-         # print starlings[:,14]
-        # print world 
-         world = form_world(starlings, resolution)
-         
-         print "frame: " + str(count)
-  
-         count += 1
+      draw(starlings, resolution, count)
+      # print "init"
+      # print starlings[:,0:6]
+      # starlings = opcl.execute(starlings, world)
+      try:
+        starlings = opcl.execute(num, starlings, world)
+      except cl.RuntimeError, e:
+        print str(e)
+        np.set_printoptions(threshold=np.nan, linewidth=512)
+        print starlings[:,0:15]
+        save_as_hd5(starlings, resolution)
+        raise
+      #starlings = init_data(num, resolution[0], resolution[1])
+      # print "res"
+      # print "position/velocity"
+      #print starlings[:,0:15]
+      # print "cohesion"
+      # print starlings[:,6:9]
+      # print "separation"
+      # print starlings[:,9:12]
+      # print "observed"
+      # print starlings[:,12]
+      # print "coheded"
+      # print starlings[:,13]
+      # print "separated"
+      # print starlings[:,14]
+      # print world 
+      world = form_world(starlings, resolution)
+
+      print "frame: " + str(count)
+
+      count += 1
