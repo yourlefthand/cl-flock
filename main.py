@@ -65,11 +65,11 @@ def form_world(population, resolution):
 
 def save_as_hd5(population, resolution):
     h5_out = tables.open_file('./starlings.h5', mode='w', title="Starlings")
-    root = ht_out.root
+    root = h5_out.root
     h5_out.create_array(root, "population", population)
     h5_out.create_array(root, "resolution", resolution)
     h5_out.close()
-    
+
 def read_from_hd5():
     h5_in = tables.open_file('./starlings.h5', mode='r')
     population = h5_in.get_node("population").read()
