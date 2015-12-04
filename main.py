@@ -63,17 +63,24 @@ def form_world(population, resolution):
     world[population[:,0],population[:,1], population[:,2]] = 1
     return world
 
-def save_as_hd5(population, resolution):
-    h5_out = tables.open_file('./starlings.h5', mode='w', title="Starlings")
+def save_as_hd5(population, resolution, filepath=None):
+    if filepath:
+      h5_out = tables.open_file(filepath, mode='w', title="Starlings")
+    else:
+      h5_out = tables.open_file('./starlings.h5', mode='w', title="Starlings")
     root = h5_out.root
     h5_out.create_array(root, "population", population)
     h5_out.create_array(root, "resolution", resolution)
     h5_out.close()
 
-def read_from_hd5():
-    h5_in = tables.open_file('./starlings.h5', mode='r')
-    population = h5_in.get_node("population").read()
-    resolution = h5_in.get_node("resolution").read()
+def read_from_hd5(filepath=None):
+    if filepath:
+      h5_in = tables.open_file(filepath, mode='r')
+    else:
+      h5_in = tables.open_file('./starlings.h5', mode='r')
+    population = h5_in.get_node("/population").read()
+    resolution = h5_in.get_node("/resolution").read()
+    h5_in.close()
     return population, resolution
 
 class OpenCl(object):
@@ -185,18 +192,30 @@ if __name__ == "__main__":
     #resolution = [32, 32, 32]
 
     #num = 6 * 6 * 1
-    #resolution = [6, 6, 1]
+    #resolution = [6, 6, 1]  
 
+    filepath = [arg for arg in sys.argv if arg == "-f" or arg == "--file"]
+
+    if len(filepath) > 1:
+      filepath = [path for path in filepath if path != "-f" or path != "--file"]
+      if len(filepath) > 1:
+        print "wat"
+      starlings, resolution = read_from_hd5(filepath=filepath[0])
+    elif len(filepath) == 1:
+      starlings, resolution = read_from_hd5()
+    else:
+      starlings = init_data(num, resolution)
+
+    print resolution
+    print starlings.shape
+    
     dt = .001
-
-    starlings = init_data(num, resolution)
-    world = form_world(starlings, resolution)
-
 
     opcl = OpenCl(dt)
 
     count = 0
-   
+
+    world = form_world(starlings, resolution)
 
     while True:
       draw(starlings, resolution, count)
@@ -209,7 +228,10 @@ if __name__ == "__main__":
         print str(e)
         np.set_printoptions(threshold=np.nan, linewidth=512)
         print starlings[:,0:15]
-        save_as_hd5(starlings, resolution)
+        if filepath and filepath[0]:
+          save_as_hd5(starlings, resolution, filepath[0])
+        else:
+          save_as_hd5(starlings, resolution)
         raise
       #starlings = init_data(num, resolution[0], resolution[1])
       # print "res"
@@ -227,7 +249,6 @@ if __name__ == "__main__":
       # print starlings[:,14]
       # print world 
       world = form_world(starlings, resolution)
-
       print "frame: " + str(count)
 
       count += 1
