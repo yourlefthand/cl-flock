@@ -1,6 +1,6 @@
 #pragma OPENCL EXTENSION cl_khr_3d_image_writes : enable
 
-const sampler_t world_sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_NEAREST;
+const sampler_t world_sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_REPEAT | CLK_FILTER_NEAREST;
 
 int4 resolve_difference(
 	int4 a_vec,
@@ -40,6 +40,90 @@ float f_dot(
 	result = dot(a_vec_f, b_vec_f);
 
 	return result;
+}
+
+float4 observe_world(
+		int limit_observations,
+	    int retina_radius,
+	    in3 search_dir,
+		int4 position,
+		int4 search_dir,
+		image3d_t world
+	    )
+{
+	float4 desire;
+	float4 separation = 0;
+	float4 cohesion = 0;
+
+	int4 world_shape = get_image_dim(world);
+
+	int4 observed_position;
+	int4 image_read_out;
+	int4 image_read;
+
+	int x = 0;
+	int y = 0;
+	int z = 0;
+
+	int separated;
+	int coheded;
+
+	int buffer;
+
+	int observation_count = 0;
+
+	int retina_diameter = retina_radius * 2;
+
+	int range = min(retina_diameter, world_shape.z) * min(retina_diameter, world_shape.y) * min(retina_diameter, world_shape.z);
+
+	for (int i = 0; i < range; i++){
+		if (observation_count < limit_observations){
+			// test world at certain coordinates given conditions below
+			if (((-1 * retina_radius) < x <= retina_radius) && ((-1 * retina_radius) < y <= retina_radius) && ((-1 * retina_radius) < z <= retina_radius) {
+				observed_position.x = x;
+				observed_position.y = y;
+				observed_position.z = z;
+
+				observed_position = position + observed_position;
+
+				image_read_out.x = observed_position.z;
+				image_read_out.y = observed_position.y;
+				image_read_out.z = observed_position.x;
+
+				image_read = read_imagei(world, world_sampler, image_read_out);
+
+				// calculate separation and cohesion given the conditions below 
+				if (image_read.x > 0){
+
+				}
+			}
+			// calculate conditions for direction change in spiral search
+			if ((x == y) || ((x < 0) && (x == -y)) || ((x > 0) && (x == 1 - y))) {
+				buffer = search_dir.x;
+				search_dir.x = -1 * search_dir.y;
+				search_dir.y = buffer;
+			}
+			if ((x == z) || ((x < 0) && (x == -z)) || ((x > 0) && (x == 1 - z))) {
+				buffer = search_dir.x;
+				search_dir.x = -1 * search_dir.z;
+				search_dir.z = buffer;
+			}
+			if ((y == z) || ((y < 0) && (y == -z)) || ((y > 0) && (y == 1 - z))) {
+				buffer = search_dir.y;
+				search_dir.y = -1 * search_dir.z;
+				search_dir.z = buffer;
+			}
+			// change observed position
+			x = x + search_dir.x;
+			y = y + search_dir.y;
+			z = z + search_dir.z;
+		} else {
+			desire = (cohesion / coheded) - (separation / separated);
+			return desire;
+		}
+	}
+	float4 desire = (cohesion / coheded) - (separation / separated);
+	return desire;
 }
 
 int3 check_border(
@@ -82,6 +166,8 @@ int3 check_border(
 
 	return outcome;
 }
+
+
 
 
 __kernel void knn(
