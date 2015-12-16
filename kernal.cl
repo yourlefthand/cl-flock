@@ -45,7 +45,6 @@ float f_dot(
 float4 observe_world(
 		int limit_observations,
 	    int retina_radius,
-	    in3 search_dir,
 		int4 position,
 		int4 search_dir,
 		image3d_t world
@@ -77,52 +76,52 @@ float4 observe_world(
 	int range = min(retina_diameter, world_shape.z) * min(retina_diameter, world_shape.y) * min(retina_diameter, world_shape.z);
 
 	for (int i = 0; i < range; i++){
-		if (observation_count < limit_observations){
-			// test world at certain coordinates given conditions below
-			if (((-1 * retina_radius) < x <= retina_radius) && ((-1 * retina_radius) < y <= retina_radius) && ((-1 * retina_radius) < z <= retina_radius) {
-				observed_position.x = x;
-				observed_position.y = y;
-				observed_position.z = z;
+		// if (observation_count < limit_observations){
+		// 	// test world at certain coordinates given conditions below
+		// 	if (((-1 * retina_radius) < x <= retina_radius) && ((-1 * retina_radius) < y <= retina_radius) && ((-1 * retina_radius) < z <= retina_radius) {
+		// 		observed_position.x = x;
+		// 		observed_position.y = y;
+		// 		observed_position.z = z;
 
-				observed_position = position + observed_position;
+		// 		observed_position = position + observed_position;
 
-				image_read_out.x = observed_position.z;
-				image_read_out.y = observed_position.y;
-				image_read_out.z = observed_position.x;
+		// 		image_read_out.x = observed_position.z;
+		// 		image_read_out.y = observed_position.y;
+		// 		image_read_out.z = observed_position.x;
 
-				image_read = read_imagei(world, world_sampler, image_read_out);
+		// 		image_read = read_imagei(world, world_sampler, image_read_out);
 
-				// calculate separation and cohesion given the conditions below 
-				if (image_read.x > 0){
+		// 		// calculate separation and cohesion given the conditions below 
+		// 		if (image_read.x > 0){
 
-				}
-			}
-			// calculate conditions for direction change in spiral search
-			if ((x == y) || ((x < 0) && (x == -y)) || ((x > 0) && (x == 1 - y))) {
-				buffer = search_dir.x;
-				search_dir.x = -1 * search_dir.y;
-				search_dir.y = buffer;
-			}
-			if ((x == z) || ((x < 0) && (x == -z)) || ((x > 0) && (x == 1 - z))) {
-				buffer = search_dir.x;
-				search_dir.x = -1 * search_dir.z;
-				search_dir.z = buffer;
-			}
-			if ((y == z) || ((y < 0) && (y == -z)) || ((y > 0) && (y == 1 - z))) {
-				buffer = search_dir.y;
-				search_dir.y = -1 * search_dir.z;
-				search_dir.z = buffer;
-			}
-			// change observed position
-			x = x + search_dir.x;
-			y = y + search_dir.y;
-			z = z + search_dir.z;
-		} else {
-			desire = (cohesion / coheded) - (separation / separated);
-			return desire;
-		}
+		// 		}
+		// 	}
+		// 	// calculate conditions for direction change in spiral search
+		// 	if ((x == y) || ((x < 0) && (x == -y)) || ((x > 0) && (x == 1 - y))) {
+		// 		buffer = search_dir.x;
+		// 		search_dir.x = -1 * search_dir.y;
+		// 		search_dir.y = buffer;
+		// 	}
+		// 	if ((x == z) || ((x < 0) && (x == -z)) || ((x > 0) && (x == 1 - z))) {
+		// 		buffer = search_dir.x;
+		// 		search_dir.x = -1 * search_dir.z;
+		// 		search_dir.z = buffer;
+		// 	}
+		// 	if ((y == z) || ((y < 0) && (y == -z)) || ((y > 0) && (y == 1 - z))) {
+		// 		buffer = search_dir.y;
+		// 		search_dir.y = -1 * search_dir.z;
+		// 		search_dir.z = buffer;
+		// 	}
+		// 	// change observed position
+		// 	x = x + search_dir.x;
+		// 	y = y + search_dir.y;
+		// 	z = z + search_dir.z;
+		// } else {
+		// 	desire = (cohesion / coheded) - (separation / separated);
+		// 	return desire;
+		// }
 	}
-	float4 desire = (cohesion / coheded) - (separation / separated);
+	desire = (cohesion / coheded) - (separation / separated);
 	return desire;
 }
 
@@ -178,6 +177,9 @@ __kernel void knn(
 	int inner_rad, int outer_rad
 	)
 {	
+
+	int max_vel = max(world_size_x, max(world_size_y, world_size_z)) / 6;
+
 	unsigned int gid = get_global_id(0);
 
 	private int search_dimension = ((2 * outer_rad) + 1);
@@ -271,11 +273,11 @@ __kernel void knn(
 									if (islessequal(local_dist, (float) outer_rad) != 0) {
 										if (isgreater(local_dist, (float) inner_rad) != 0) {
 											// searched point is in that outer zones of the target's perception
-											cohesion = cohesion + f_difference_vector;
+											cohesion = cohesion + f_difference_vector * (local_dist / (outer_rad / 2));
 											coheded = coheded + 1;
 										} else {
 											// searched pont is within the outer zone of the target's perception
-											separation = separation + f_difference_vector;
+											separation = separation + f_difference_vector * (local_dist / (inner_rad /2));
 											separated = separated + 1;
 										}	
 									}
@@ -325,7 +327,7 @@ __kernel void knn(
 
 	int3 accel_frame_debug = convert_int_rtz(accel_frame);
 
-	velocity = (starling[gid].s345 + convert_int_rtz(accel_frame.s012)) % (world_size_x / 2);
+	velocity = (starling[gid].s345 + convert_int_rtz(accel_frame.s012)) % (max_vel);
 
 	position = p.s012 + velocity;
 
