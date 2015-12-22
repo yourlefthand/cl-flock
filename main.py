@@ -41,8 +41,20 @@ def init_data(population_size, resolution):
     population[:,7] *= np.random.random_sample((num,))
     population[:,7] += 1
 
+    #RGBA - data to be read by other members
+    population[:,8] = np.arange(num) % 255
+    population[:,8] *= np.random.random_sample((num,))
+
+    population[:,9] = np.arange(num) % 255
+    population[:,9] *= np.random.random_sample((num,))
+
+    population[:,10] = np.arange(num) % 255
+    population[:,10] *= np.random.random_sample((num,))
+
+    population[:,11] = np.arange(num) % 255
+    population[:,11] *= np.random.random_sample((num,))
     #genomic weights to be used as bytestrings
-    population[:,8:16] = 0 
+    population[:,12:16] = 0 
 
     return population
 
@@ -61,6 +73,15 @@ def form_world(population, resolution):
 
     world = np.zeros((res_x, res_y, res_z), dtype=np.int32)
     world[population[:,0],population[:,1], population[:,2]] = 1
+    return world
+
+def form_color_world(population, resolution):
+    res_x = resolution[0]
+    res_y = resolution[1]
+    res_z = resolution[2]
+
+    world = np.zeros((res_x, res_y, res_z, 4), dtype=np.int32)
+    world[population[:,0],population[:,1], population[:,2]] = population[:,8:12]
     return world
 
 def save_as_hd5(population, resolution, filepath=None):
@@ -114,7 +135,8 @@ class OpenCl(object):
         population_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=population)
 
 #        world_cl = cl.Buffer(self.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=world.flatten())
-        world_cl = cl.image_from_array(self.ctx, world, mode="r")
+        #world_cl = cl.image_from_array(self.ctx, world, mode="r")
+        world_cl = cl.image_from_array(self.ctx, world, num_channels=4, mode="r")
         
         return population_cl, world_cl, out
 
@@ -215,7 +237,8 @@ if __name__ == "__main__":
 
     count = 0
 
-    world = form_world(starlings, resolution)
+    #world = form_world(starlings, resolution)
+    world = form_color_world(starlings, resolution)
 
     while True:
       draw(starlings, resolution, count)
@@ -248,7 +271,9 @@ if __name__ == "__main__":
       # print "separated"
       # print starlings[:,14]
       # print world 
-      world = form_world(starlings, resolution)
+      #world = form_world(starlings, resolution)
+      world = form_color_world(starlings, resolution)
+
       print "frame: " + str(count)
 
       count += 1
