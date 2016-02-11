@@ -29,9 +29,9 @@ float f_distance(
 }
 
 float f_dot(
-		int3 a_vec,
-		int3 b_vec
-		)
+	int3 a_vec,
+	int3 b_vec
+	)
 {
 	private float result;
 
@@ -41,6 +41,26 @@ float f_dot(
 	result = dot(a_vec_f, b_vec_f);
 
 	return result;
+}
+
+float f_cos_sim(
+	int3 v_vec,
+	int3 i_vec
+	)
+{
+	private float result;
+	
+	private float3 origin = 0;
+
+	private float3 f_i_vec = convert_float3(i_vec);
+	private float3 f_v_vec = convert_float3(v_vec);
+
+	private float idist = distance(origin, f_i_vec);
+	private float vdist = distance(origin, f_v_vec);
+
+	private float vdot = dot(f_i_vec, f_v_vec);
+
+	return idist;
 }
 
 /*
@@ -54,7 +74,7 @@ int4 count(
 	int value
 	)
 {
-	private int4 coords;
+	private int4 coords = 0;
 	coords.x = ((value / (1)) % dimensions.x) - (dimensions.x / 2);
 	coords.y = ((value / (1 * dimensions.x)) % dimensions.y) - (dimensions.y / 2);
 	coords.z = ((value / (1 * dimensions.x * dimensions.y)) % dimensions.z) - (dimensions.z / 2);
@@ -71,6 +91,9 @@ __kernel void knn(
 	int inner_rad, int outer_rad
 	)
 {	
+	unsigned int gid = get_global_id(0);
+
+	int3 origin = 0;
 
 	int3 world_size;
 	world_size.x = world_size_x;
@@ -82,14 +105,14 @@ __kernel void knn(
 	window.y = min((2 * outer_rad) + 1, world_size.y);
 	window.z = min((2 * outer_rad) + 1, world_size.z);
 
-	unsigned int gid = get_global_id(0);
+	int max_vel = max(window.x, max(window.y, window.z)) / 15;
 
-	int4 p;
+	int4 p = 0;
 	p.s012 = starling[gid].s012;
 	
-	int4 v;
+	int4 v = 0;
 	v.s012 = starling[gid].s345;
-
+	
 	int seen = 0;
 	int coheded = 0;
 	int separated = 0;
@@ -97,6 +120,7 @@ __kernel void knn(
 	float4 separation = 0;
 	float4 cohesion = 0;
 
+	int local_dot_debug;
 	// int4 image_debug;
 	// int4 local_pos_debug;
 	// int4 world_pos_debug;
@@ -123,11 +147,22 @@ __kernel void knn(
 		 * local_world = write_imagei(local_world, local_world_pos, CLK_UNSIGNED_INT8);
 		 */
 
-		if (image_read.x > 0){
-			int4 difference_vector = resolve_difference(world_pos, p);
-			float4 f_difference_vector = convert_float(difference_vector);
+		if (image_read.x > 0) {
 
-			float local_dist = f_distance(p.s012, world_pos.s012);
+			float4 f_local_pos = convert_float(local_pos);
+
+			float4 f_v = convert_float(v);
+
+			float local_dist = length(f_local_pos);
+			float v_dist = length(f_v);
+
+			float local_dot = dot(f_local_pos, f_v) / (v_dist * local_dist);
+			local_dot = min(local_dot, (float) 0.1);
+
+			// local_dot_debug = convert_int_rtz(local_dot * 10);
+
+			//float local_dist = f_distance(origin, local_pos.s012);
+			//float local_sim = f_dot(local_pos.s012, v.s012);
 
 			/* 
 			 * here we have 'cohesion and separation' conditions
@@ -146,11 +181,11 @@ __kernel void knn(
 			if (islessequal(local_dist, (float) outer_rad) != 0) {
 				if (isgreater(local_dist, (float) inner_rad) != 0) {
 					// searched point is in that outer zones of the target's perception
-					cohesion = cohesion + (f_difference_vector * ((local_dist * 2) / outer_rad));
+					cohesion = cohesion + (f_local_pos * ((local_dist * 2) / outer_rad));
 					coheded = coheded + 1;
 				} else {
 					// searched pont is within the outer zone of the target's perception
-					separation = separation - (f_difference_vector * ((inner_rad - local_dist) / inner_rad));
+					separation = separation - (f_local_pos * ((inner_rad - local_dist) / inner_rad));
 					separated = separated + 1;
 				}	
 			}
@@ -232,10 +267,12 @@ __kernel void knn(
 	out[gid].s8 = coheded;
 	out[gid].s9 = separated;
 
-	out[gid].sab = convert_int3_rtz(cohesion.s01);
-	out[gid].sc = coheded;
-	out[gid].sde = convert_int3_rtz(separation.s01);
-	out[gid].sf = separated;
+	out[gid].sabcdef = 0;
+
+	// out[gid].sab = convert_int3_rtz(cohesion.s01);
+	// out[gid].sc = coheded;
+	// out[gid].sde = convert_int3_rtz(separation.s01);
+	// out[gid].sf = separated;
 
 
 	// out[gid].sc = seen;
