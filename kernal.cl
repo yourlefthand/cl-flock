@@ -121,9 +121,6 @@ __kernel void knn(
 	float4 cohesion = 0;
 
 	int local_dot_debug;
-	// int4 image_debug;
-	// int4 local_pos_debug;
-	// int4 world_pos_debug;
 
 	for (int i = 0; i < (window.x * window.y * window.z); i++){
 		int4 local_pos = count(window, i);
@@ -137,73 +134,23 @@ __kernel void knn(
 
 		int4 image_read = read_imagei(world, world_sampler, image_read_out);
 
-		// image_debug = image_read_out;
-		// local_pos_debug = local_pos;
-		// world_pos_debug = world_pos;
+		float4 f_local_pos = convert_float(local_pos);
 
-		/* 
-		 * I'd like to get this to work - we could write the convolution layers out to images -> numpy arrays -> your-format-here
-		 * but, i can't get 3d images to write! despite the above 'pragma' (nice). This can be returned to.	
-		 * local_world = write_imagei(local_world, local_world_pos, CLK_UNSIGNED_INT8);
-		 */
+		float local_dist = length(f_local_pos);
 
-		if (image_read.x > 0) {
-
-			float4 f_local_pos = convert_float(local_pos);
-
-			float4 f_v = convert_float(v);
-
-			float local_dist = length(f_local_pos);
-			float v_dist = length(f_v);
-
-			float local_dot = dot(f_local_pos, f_v) / (v_dist * local_dist);
-			local_dot = min(local_dot, (float) 0.1);
-
-			// local_dot_debug = convert_int_rtz(local_dot * 10);
-
-			//float local_dist = f_distance(origin, local_pos.s012);
-			//float local_sim = f_dot(local_pos.s012, v.s012);
-
-			/* 
-			 * here we have 'cohesion and separation' conditions
-			 * it would be nice to translate this into a single function --- hm, a sigmoid?!
-			 * if I could add signal passing to this, I'd have a neural layer!!! not only that, but a layer
-			 * for analyzing matrices of data **convolutionally** (i.e. framed)
-			 * it'd be interesting to return to the perceptron capabilities in that Minsky & Papert i.e.
-			 * optimizing search pattern - check this out: http://danielrapp.github.io/morph/ for generative
-			 * lensing!
-			 * 
-			 * turning this switch into a lambda with emittable values will make all the difference.
-			 * at the moment- perhaps this will change - we will want to keep 'moving' the target value a la
-			 * simulation - this data stream will be passed to a time-dilation layer - genetic memory
-			 */
-
-			if (islessequal(local_dist, (float) outer_rad) != 0) {
-				if (isgreater(local_dist, (float) inner_rad) != 0) {
-					// searched point is in that outer zones of the target's perception
-					cohesion = cohesion + (f_local_pos * ((local_dist * 2) / outer_rad));
+		if (islessequal(local_dist, (float) outer_rad) != 0) {
+			if (image_read.x > 0) {
+				if (isgreater(local_dist, (float) inner_rad)) {
+					cohesion = cohesion + (f_local_pos * ((2 * local_dist) / outer_rad));
 					coheded = coheded + 1;
-				} else {
-					// searched pont is within the outer zone of the target's perception
-					separation = separation - (f_local_pos * ((inner_rad - local_dist) / inner_rad));
+				}
+			} else {
+				if (islessequal(local_dist, (float) inner_rad)) {
+					separation = separation + (f_local_pos * ((2 * (inner_rad - local_dist) / inner_rad)));
 					separated = separated + 1;
-				}	
+				}
 			}
-
 			seen = seen + 1;
-
-			/* 
-			 * what I need here is an algorithm that can do the following: make an assumption about the direction
-			 * of a neighbor by comparing the hash of it's velocity (vector) to their hashes via the color channel
-			 * of the received image. This is complicated by the fact that I have no idea how to store that info
-			 * in those goddamn image objects and that the hash is so simple it will result in three 'phases' during
-			 * comparison - such that our given comparitor vector is simply rotated and hashed - appearing 
-			 * identical, despite being somehor orthogonal. Still, understanding the period of these phsases
-			 * would allow us to predict those that are facing (thus threatening to collide with) our unit - with
-			 * some modular accuracy. we'll use this 'alignment' calculation to weigh our intended escape vector
-			 * and subsequent power applications. translated into a vector (after casting our die, so to speak)
-			 * we can now calculate position forward one frame, and proceed to update the model
-			 */
 		}
 	}
 
@@ -214,16 +161,13 @@ __kernel void knn(
 	float3 accel_frame = 0;
 	int3 velocity = 0;
 	int3 position = 0;
-
-	//private int4 desire = p + convert_int((cohesion / coheded) - (separation / separated));
 	
-	float4 desire = (cohesion / (coheded + 1)) - (separation / (separated + 1));
+	float4 normal_cohede = (cohesion / max(coheded, 1));
+	float4 normal_separate = (separation / max(separated, 1));
 
-	//float4 desire = cohesion - separation;
+	float4 desire = (normal_cohede) + (normal_separate);
 
-	/*
-	 * there has to be a better way
-     */
+
 
 	int3 desire_debug = convert_int3_rtz(desire.s012);
 
@@ -231,11 +175,12 @@ __kernel void knn(
 
 	int3 accel_frame_debug = convert_int3_rtz(accel_frame);
 
-	velocity = starling[gid].s345 + convert_int3_rtz(accel_frame.s012);
+	velocity = (starling[gid].s345 / 2) + convert_int3_rtz(accel_frame.s012);
+	//velocity = convert_int3_rtz(accel_frame.s012);
+
 
 	position = p.s012 + velocity;
 
-    // position = desire.s012;
 
 	if (position.x < 0) {
 		position.x = world_size.x + (position.x % world_size.x);
