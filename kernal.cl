@@ -165,7 +165,8 @@ __kernel void knn(
 	float4 normal_cohede = (cohesion / max(coheded, 1));
 	float4 normal_separate = (separation / max(separated, 1));
 
-	float4 desire = (normal_cohede) + (normal_separate);
+	//float4 desire = ((normal_cohede) + (normal_separate)) / 2;
+	float4 desire = normal_cohede;
 
 
 
@@ -175,13 +176,35 @@ __kernel void knn(
 
 	int3 accel_frame_debug = convert_int3_rtz(accel_frame);
 
-	velocity = (starling[gid].s345 / 2) + convert_int3_rtz(accel_frame.s012);
+	velocity = starling[gid].s345 + convert_int3_rtz(accel_frame.s012);
 	//velocity = convert_int3_rtz(accel_frame.s012);
 
 
 	position = p.s012 + velocity;
 
+	// //bounce-space
+	// if (position.x < 0) {
+	// 	position.x = abs(position.x);
+	// }
+	// if (position.x > world_size.x - 1){
+	// 	position.x = (world_size.x - 1) - (position.x % world_size.x);
+	// }
 
+	// if (position.y < 0) {
+	// 	position.y = abs(position.y);
+	// }
+	// if (position.y > world_size.y - 1){
+	// 	position.y = (world_size.y - 1) - (position.y % world_size.y);
+	// }
+
+	// if (position.z < 0) {
+	// 	position.z = abs(position.z);
+	// }
+	// if (position.z > world_size.z - 1){
+	// 	position.z = (world_size.z - 1) - (position.z % world_size.z); 
+	// }
+
+	// //wrap-space
 	if (position.x < 0) {
 		position.x = world_size.x + (position.x % world_size.x);
 	}
