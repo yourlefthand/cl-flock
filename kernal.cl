@@ -141,12 +141,12 @@ __kernel void knn(
 		if (islessequal(local_dist, (float) outer_rad) != 0) {
 			if (image_read.x > 0) {
 				if (isgreater(local_dist, (float) inner_rad)) {
-					cohesion = cohesion + (f_local_pos * ((2 * local_dist) / outer_rad));
+					cohesion = cohesion + f_local_pos; //(f_local_pos * ((2 * local_dist) / outer_rad));
 					coheded = coheded + 1;
 				}
 			} else {
-				if (islessequal(local_dist, (float) inner_rad)) {
-					separation = separation + (f_local_pos * ((2 * (inner_rad - local_dist) / inner_rad)));
+				if (isgreater(local_dist, (float) inner_rad)) {
+					separation = separation + f_local_pos; //(f_local_pos * 2);
 					separated = separated + 1;
 				}
 			}
@@ -165,8 +165,9 @@ __kernel void knn(
 	float4 normal_cohede = (cohesion / max(coheded, 1));
 	float4 normal_separate = (separation / max(separated, 1));
 
-	//float4 desire = ((normal_cohede) + (normal_separate)) / 2;
+	//float4 desire = (normal_cohede) + (normal_separate);
 	float4 desire = normal_cohede;
+	//float4 desire = normal_separate;
 
 
 
@@ -176,8 +177,11 @@ __kernel void knn(
 
 	int3 accel_frame_debug = convert_int3_rtz(accel_frame);
 
-	velocity = starling[gid].s345 + convert_int3_rtz(accel_frame.s012);
-	//velocity = convert_int3_rtz(accel_frame.s012);
+	if (length(convert_float4(starling[gid].s345)) < 10) {
+		velocity = starling[gid].s345 + convert_int3_rtz(accel_frame.s012);
+	} else {
+		velocity = convert_int3_rtz(accel_frame.s012);
+	}
 
 
 	position = p.s012 + velocity;
@@ -235,7 +239,8 @@ __kernel void knn(
 	out[gid].s8 = coheded;
 	out[gid].s9 = separated;
 
-	out[gid].sabcdef = 0;
+	out[gid].sabc = convert_int3_rtz(normal_cohede.s012);
+	out[gid].sdef = convert_int3_rtz(normal_separate.s012);
 
 	// out[gid].sab = convert_int3_rtz(cohesion.s01);
 	// out[gid].sc = coheded;
