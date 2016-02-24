@@ -86,12 +86,12 @@ __kernel void knn(
 
 		if (islessequal(local_dist, (float) outer_rad) != 0) {
 			if (image_read.x > 0) {
-				if (isgreater(local_dist, (float) inner_rad)) {
+				if (islessequal(local_dist, (float) inner_rad)) {
 					cohesion = cohesion + (f_local_pos * inv_cos_sim); // * ((2 * local_dist) / outer_rad));
 					coheded = coheded + 1;
 				}
 			} else {
-				if (islessequal(local_dist, (float) inner_rad)) {
+				if (isgreater(local_dist, (float) inner_rad)) {
 					separation = separation + (f_local_pos * inv_cos_sim); // * ((2 * (outer_rad - local_dist)) / outer_rad));
 					separated = separated + 1;
 				}
@@ -116,11 +116,11 @@ __kernel void knn(
 
 	int3 desire_debug = convert_int3_rtz(desire.s012);
 
-	float4 impulse = -1 * (f_vel - desire);
+	float4 impulse = desire - f_vel;
 
 	int3 impulse_debug = convert_int3_rtz(impulse.s012);
 
-	accel_frame = acc_coef * impulse.s012;
+	accel_frame = acc_coef * desire.s012;
 
 	int3 accel_frame_debug = convert_int3_rtz(accel_frame);
 
@@ -158,6 +158,7 @@ __kernel void knn(
 	out[gid].s8 = coheded;
 	out[gid].s9 = separated;
 
-	out[gid].sabc = desire_debug.s012;
-	out[gid].sdef = accel_frame_debug.s012;
+	out[gid].sab = impulse_debug.s01;
+	out[gid].scd = desire_debug.s01;
+	out[gid].sef = accel_frame_debug.s01;
 }
