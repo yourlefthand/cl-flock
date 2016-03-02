@@ -9,6 +9,59 @@ const sampler_t world_sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_REPEAT
  * remember: denominator is the cum-product of the dimension limit [0:d) 
  */
 
+float3 grav_accel(
+	float3 a_pos, 
+	float a_mass, 
+	float3 b_pos, 
+	float b_mass
+	)
+{
+	const float GRAVITATION = 1.0f;
+	float3 accel = 0;
+
+	float3 delta_pos = a_pos - b_pos;
+	float dist = length(delta_pos);
+	float dist_sq = pow(dist, 2.0f);
+
+	float force = GRAVITATION * a_mass * b_mass / dist_sq;
+	accel = force * delta_pos / dist;
+	return accel;
+}
+
+float8 rk_accel(
+	float3 a_pos, float3 a_vel, float a_mass,
+	float3 b_pos, float b_mass,
+	float3 c_pos, float c_mass
+	)
+{
+	float8 out = 0;
+
+	float3 k1 = grav_accel(a_pos, a_mass, b_pos, b_mass) + grav_accel(a_pos, a_mass, c_pos, c_mass);
+
+	float3 p2 = a_pos + a_vel;
+	float3 v2 = a_vel + k1;
+
+	float3 k2 = grav_accel(p2, a_mass, b_pos, b_mass) + grav_accel(p2, a_mass, c_pos, c_mass);
+
+	float3 p3 = p2 + v2;
+	float3 v3 = v2 + k2;
+
+	float3 k3 = grav_accel(p3, a_mass, b_pos, b_mass) + grav_accel(p3, a_mass, c_pos, c_mass);
+
+	float3 p4 = p3 + v3;
+	float3 v4 = v3 + k3;
+
+	float3 k4 = grav_accel(p4, a_mass, b_pos, b_mass) + grav_accel(p4, a_mass, c_pos, c_mass);
+
+	float3 vf = a_vel + 1.0f/6.0f * (k1 + 2 * k2 + 2 * k3 + k4);
+	float3 pf = a_pos + 1.0f/6.0f * (a_vel + 2 * v2 + 2 * v3 + v4);
+
+	out.s012 = vf;
+	out.s345 = pf;
+	out.s67 = 0;
+	return out;
+}
+
 int4 count(
 	int3 dimensions,
 	int value
@@ -47,6 +100,8 @@ __kernel void knn(
 
 	int4 p = 0;
 	p.s012 = starling[gid].s012;
+
+	float4 f_pos = convert_float(p);
 	
 	int4 v = 0;
 	v.s012 = starling[gid].s345;
@@ -82,51 +137,81 @@ __kernel void knn(
 
 		float cos_sim = dot(f_vel, local_dist) / (v_dist * local_dist);
 
-		float inv_cos_sim = -1 * (1 + max(cos_sim, (float) 0));
+		//float inv_cos_sim = 1 - max(cos_sim, (float) 0.0);
+		//float inv_cos_sim = 1;
 
 		if (islessequal(local_dist, (float) outer_rad) != 0) {
 			if (image_read.x > 0) {
-				if (islessequal(local_dist, (float) inner_rad)) {
-					cohesion = cohesion + (f_local_pos * inv_cos_sim); // * ((2 * local_dist) / outer_rad));
+				//if (isgreater(local_dist, (float) inner_rad)) {
+					cohesion = cohesion + f_local_pos; // * (local_dist / outer_rad));
 					coheded = coheded + 1;
-				}
+				//}
 			} else {
-				if (isgreater(local_dist, (float) inner_rad)) {
-					separation = separation + (f_local_pos * inv_cos_sim); // * ((2 * (outer_rad - local_dist)) / outer_rad));
+				//if (isgreater(local_dist, (float) inner_rad)) {
+					separation = separation + f_local_pos; //* ((inner_rad - local_dist) / inner_rad));
 					separated = separated + 1;
-				}
+				//}
 			}
 			seen = seen + 1;
 		}
 	}
 
+	position = p.s012 + velocity;
+
 	float l = convert_float(starling[gid].s6);
 	float m = convert_float(starling[gid].s7);
 
 	float acc_coef = l / m;
-
+	
 	float3 accel_frame = 0;
 	int3 velocity = 0;
 	int3 position = 0;
 	
+	float f_cohede = (float) coheded;
+	float f_separa = (float) separated;
+
 	float4 normal_cohede = (cohesion / max(coheded, 1));
 	float4 normal_separate = (separation / max(separated, 1));
+
+	float4 nn_cohede = normal_cohede * 116 / length(normal_cohede);
+	float4 nn_separate = normal_separate * 116 / length(normal_separate);
+
+	float8 rk = rk_accel(
+		(float3) (0.0f,0.0f,0.0f), 
+		f_vel.s012, 
+		m, 
+		nn_cohede.s012, 
+		f_cohede,
+		nn_separate.s012,
+		f_separa);
+
+	// velocity = convert_int3_rtz(rk.s012);
+
+	int3 vel_debug = convert_int3_rtz(rk.s012);
+
+	int3 pos_debug = convert_int3_rtz(rk.s345);
 
 	float4 desire = ((normal_cohede) + (normal_separate));
 
 	int3 desire_debug = convert_int3_rtz(desire.s012);
 
-	float4 impulse = desire - f_vel;
-
-	int3 impulse_debug = convert_int3_rtz(impulse.s012);
-
 	accel_frame = acc_coef * desire.s012;
 
 	int3 accel_frame_debug = convert_int3_rtz(accel_frame);
 
-	velocity = v.s012 + convert_int3_rtz(accel_frame.s012);	
+	velocity = v.s012 + convert_int3_rtz(accel_frame.s012);
 
-	position = p.s012 + velocity;
+	// if (abs(velocity.x) > max_vel){
+	// 	velocity.x = 0;
+	// }
+	// if (abs(velocity.y) > max_vel){
+	// 	velocity.y = 0;
+	// }
+	// if (abs(velocity.z) > max_vel){
+	// 	velocity.z = 0;
+	// }
+
+    // position = p.s012 + velocity;
 
 	if (position.x < 0) {
 		position.x = world_size.x + (position.x % world_size.x);
@@ -158,7 +243,8 @@ __kernel void knn(
 	out[gid].s8 = coheded;
 	out[gid].s9 = separated;
 
-	out[gid].sab = impulse_debug.s01;
-	out[gid].scd = desire_debug.s01;
-	out[gid].sef = accel_frame_debug.s01;
+	//out[gid].sabcdef = 0;
+	out[gid].sab = convert_int3_rtz(normal_cohede.s01 * 10);
+	out[gid].scd = convert_int3_rtz(normal_separate.s01 * 10);
+	out[gid].sef = 0;
 }
