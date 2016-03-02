@@ -156,7 +156,7 @@ __kernel void knn(
 		}
 	}
 
-	position = p.s012 + velocity;
+
 
 	float l = convert_float(starling[gid].s6);
 	float m = convert_float(starling[gid].s7);
@@ -166,7 +166,9 @@ __kernel void knn(
 	float3 accel_frame = 0;
 	int3 velocity = 0;
 	int3 position = 0;
-	
+
+	//  position = p.s012 + v.s012;
+
 	float f_cohede = (float) coheded;
 	float f_separa = (float) separated;
 
@@ -211,7 +213,7 @@ __kernel void knn(
 	// 	velocity.z = 0;
 	// }
 
-    // position = p.s012 + velocity;
+    position = p.s012 + velocity;
 
 	if (position.x < 0) {
 		position.x = world_size.x + (position.x % world_size.x);
