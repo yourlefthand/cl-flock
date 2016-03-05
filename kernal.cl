@@ -169,8 +169,6 @@ __kernel void knn(
 	//float4 desire = normal_cohede;
 	//float4 desire = normal_separate;
 
-
-
 	int3 desire_debug = convert_int3_rtz(desire.s012);
 
 	accel_frame = convert_float(l) / convert_float(m) * desire.s012;
