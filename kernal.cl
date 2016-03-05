@@ -165,8 +165,8 @@ __kernel void knn(
 	float4 normal_cohede = (cohesion / max(coheded, 1));
 	float4 normal_separate = (separation / max(separated, 1));
 
-	//float4 desire = (normal_cohede) + (normal_separate);
-	float4 desire = normal_cohede;
+	float4 desire = (normal_cohede) + (normal_separate);
+	//float4 desire = normal_cohede;
 	//float4 desire = normal_separate;
 
 
